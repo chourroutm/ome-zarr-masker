@@ -1,7 +1,9 @@
-"""Python API contract tests for OrganMaskPredictor (T046, contracts/python-api.md C-API-1..9).
+"""Python API contract tests for OrganMaskPredictor (T046, contracts/python-api.md C-API-1..8).
 
-Exercised with the registered ``stub`` backend so the SAM-like facade is fully covered without
-torch/GPU/weights.
+SAM2 is the only backend; there is no `backend` constructor parameter. Tests that only exercise
+argument validation before segmentation runs need no real backend. Tests that run the pipeline to
+completion are marked ``real_backend`` and require a real, GPU-powered SAM2 install to actually
+execute (skipped otherwise).
 """
 
 from __future__ import annotations
@@ -16,13 +18,18 @@ from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.io.validate import validate_ome_zarr
 from organ_masker_lite.prompts.model import PromptError
 
-from ..conftest import real_backend_available
+from ..conftest import sam2_available
+
+_HAVE_SAM2 = sam2_available()
+requires_sam2 = pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 
 
 def _predictor(store, level=0):
-    return OrganMaskPredictor(backend="stub").set_volume(store, level=level)
+    return OrganMaskPredictor().set_volume(store, level=level)
 
 
+@pytest.mark.real_backend
+@requires_sam2
 def test_c_api_1_single_point_includes_point(single_blob_zarr):
     store, (cx, cy), frame = single_blob_zarr
     p = _predictor(store)
@@ -32,6 +39,8 @@ def test_c_api_1_single_point_includes_point(single_blob_zarr):
     assert result.array[frame, int(cy), int(cx)] == 1
 
 
+@pytest.mark.real_backend
+@requires_sam2
 def test_c_api_2_box_foreground_within_box(single_blob_zarr):
     store, _center, frame = single_blob_zarr
     box = [4.0, 4.0, 12.0, 12.0]
@@ -45,6 +54,8 @@ def test_c_api_2_box_foreground_within_box(single_blob_zarr):
     assert (ys >= y0).all() and (ys < y1).all()
 
 
+@pytest.mark.real_backend
+@requires_sam2
 def test_c_api_3_negative_point_excludes_region(two_blob_zarr):
     store, (ax, ay), (bx, by), frame = two_blob_zarr
     p = _predictor(store)
@@ -73,7 +84,9 @@ def test_c_api_5_out_of_bounds_raises(single_blob_zarr):
         p.predict(axes=["z"])
 
 
-def test_c_api_8_saved_output_valid_same_levels(single_blob_zarr, tmp_path):
+@pytest.mark.real_backend
+@requires_sam2
+def test_c_api_6_saved_output_valid_same_levels(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
     p = _predictor(store)
     p.add_points(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
@@ -83,7 +96,7 @@ def test_c_api_8_saved_output_valid_same_levels(single_blob_zarr, tmp_path):
     assert OmeZarrReader(out).n_levels == OmeZarrReader(store).n_levels
 
 
-def test_c_api_9_argument_names_and_shapes_match_sam2():
+def test_c_api_7_argument_names_and_shapes_match_sam2():
     points_params = list(inspect.signature(OrganMaskPredictor.add_points).parameters)
     box_params = list(inspect.signature(OrganMaskPredictor.add_box).parameters)
     # SAM2-style prompt arguments
@@ -91,14 +104,7 @@ def test_c_api_9_argument_names_and_shapes_match_sam2():
     assert box_params == ["self", "frame_index", "box", "obj_id"]
 
 
-_HAVE_SAM3 = real_backend_available("sam3")
-
-
-@pytest.mark.real_backend
-@pytest.mark.skipif(not _HAVE_SAM3, reason="sam3 backend not constructable (torch/sam3 missing)")
-def test_c_api_7_sam3_backend_runs_same_flow(single_blob_zarr, tmp_path):
-    store, (cx, cy), frame = single_blob_zarr
-    p = OrganMaskPredictor(backend="sam3").set_volume(store, level=0)
-    p.add_points(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
-    result = p.predict(axes=["z"])
-    assert result.array.shape == OmeZarrReader(store).level_shape(0)
+def test_c_api_8_backend_kwarg_rejected():
+    """C-API-8: backend no longer exists as a parameter; passing it is a standard TypeError."""
+    with pytest.raises(TypeError, match="backend"):
+        OrganMaskPredictor(backend="sam3")

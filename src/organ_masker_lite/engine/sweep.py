@@ -10,8 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..backends.base import VideoSegmenterBackend
 from ..prompts.model import Prompt, PromptSet
+from ..sam2 import Sam2Backend
 
 
 def _check_shape(mask: np.ndarray, expected: tuple[int, ...]) -> np.ndarray:
@@ -40,7 +40,7 @@ def run_sweep(
     volume: np.ndarray,
     axis_index: int,
     prompts: PromptSet,
-    backend: VideoSegmenterBackend,
+    backend: Sam2Backend,
     workdir: str | Path,
     direction: str = "forward",
 ) -> np.ndarray:

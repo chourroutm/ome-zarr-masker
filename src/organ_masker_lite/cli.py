@@ -33,7 +33,6 @@ def _build_parser() -> argparse.ArgumentParser:
     mask.add_argument("input", help="Path to the input OME-Zarr v0.5 store")
     mask.add_argument("output", help="Path to the output OME-Zarr v0.5 store")
     mask.add_argument("--prompts", required=True, help="Prompt file (JSON)")
-    mask.add_argument("--backend", default="sam2", help="Segmentation backend (default: sam2)")
     mask.add_argument(
         "--level",
         type=int,
@@ -87,9 +86,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     interactive.add_argument("input", help="Path to the input OME-Zarr v0.5 store")
     interactive.add_argument(
-        "--backend", default="sam2", help="Segmentation backend (default: sam2)"
-    )
-    interactive.add_argument(
         "--level", type=int, default=COARSEST_LEVEL, help="Multiscale level (default: coarsest)"
     )
     interactive.add_argument("--model-dir", default=None, help="Weights directory override")
@@ -128,7 +124,6 @@ def _cmd_mask(args: argparse.Namespace) -> int:
 
         try:
             config = RunConfig(
-                backend=args.backend,
                 level=args.level,
                 axes=[a.strip() for a in args.axes.split(",") if a.strip()],
                 direction=args.direction,
@@ -172,7 +167,6 @@ def _cmd_interactive(args: argparse.Namespace) -> int:
     try:
         session = InteractiveSession(
             args.input,
-            backend=args.backend,
             level=args.level,
             model_dir=args.model_dir,
             allow_download=args.allow_download,

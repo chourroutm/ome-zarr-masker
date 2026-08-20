@@ -10,8 +10,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from organ_masker_lite.cli import main
 from organ_masker_lite.io.reader import OmeZarrReader
+
+from ..conftest import sam2_available
+
+_HAVE_SAM2 = sam2_available()
+requires_sam2 = pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 
 
 def _prompts(path: Path, frame: int, xy: list[int]) -> Path:
@@ -22,12 +29,14 @@ def _prompts(path: Path, frame: int, xy: list[int]) -> Path:
 
 
 def _run(store, out, prompts, *level):
-    argv = ["mask", str(store), str(out), "--prompts", str(prompts), "--backend", "stub"]
+    argv = ["mask", str(store), str(out), "--prompts", str(prompts)]
     if level:
         argv += ["--level", str(level[0])]
     return main(argv)
 
 
+@pytest.mark.real_backend
+@requires_sam2
 def test_valid_level_output_grid_matches_input_levels(single_blob_zarr, tmp_path):
     store, _center, _frame = single_blob_zarr  # level 0 shape (8, 16, 16), blob center (8, 8) @ z=4
     out = tmp_path / "lvl0.ome.zarr"
@@ -42,6 +51,8 @@ def test_valid_level_output_grid_matches_input_levels(single_blob_zarr, tmp_path
     assert rout.read_level(0).any()
 
 
+@pytest.mark.real_backend
+@requires_sam2
 def test_default_level_is_coarsest_when_unspecified(single_blob_zarr, tmp_path):
     store, _center, _frame = single_blob_zarr
     # coarsest level (index 1) has shape (4, 8, 8); the blob there is centred at (4, 4) on frame 2

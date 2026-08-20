@@ -7,7 +7,13 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from organ_masker_lite.cli import main
+
+from ..conftest import sam2_available
+
+_HAVE_SAM2 = sam2_available()
 
 
 def _write_prompts(path, frame, cx, cy):
@@ -18,6 +24,8 @@ def _write_prompts(path, frame, cx, cy):
     )
 
 
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_unwritable_log_dir_does_not_break_run(single_blob_zarr, tmp_path, capsys):
     store, (cx, cy), frame = single_blob_zarr
     prompts = tmp_path / "p.json"
@@ -32,8 +40,6 @@ def test_unwritable_log_dir_does_not_break_run(single_blob_zarr, tmp_path, capsy
             str(out),
             "--prompts",
             str(prompts),
-            "--backend",
-            "stub",
             "--level",
             "0",
             "--log-dir",

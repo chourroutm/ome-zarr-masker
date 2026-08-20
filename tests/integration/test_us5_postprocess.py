@@ -11,12 +11,15 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 from scipy import ndimage
 
 from organ_masker_lite.cli import main
 from organ_masker_lite.io.reader import OmeZarrReader
 
-from ..conftest import write_ome_zarr
+from ..conftest import sam2_available, write_ome_zarr
+
+_HAVE_SAM2 = sam2_available()
 
 
 def _holes(mask: np.ndarray) -> int:
@@ -47,8 +50,6 @@ def _run(store, out, prompts, *extra):
             str(out),
             "--prompts",
             str(prompts),
-            "--backend",
-            "stub",
             "--level",
             "0",
             *extra,
@@ -56,6 +57,8 @@ def _run(store, out, prompts, *extra):
     )
 
 
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_default_fillholes_disabled_and_exact_morphology(tmp_path):
     store = _hollow_store(tmp_path)
     prompts = _prompts(tmp_path / "p.json")

@@ -1,18 +1,26 @@
-"""Engine smoke test: stub-backend single-axis pipeline end-to-end (T013)."""
+"""Engine smoke test: real-SAM2 single-axis pipeline end-to-end (T013)."""
 
 from __future__ import annotations
+
+import pytest
 
 from organ_masker_lite.config import RunConfig
 from organ_masker_lite.engine.pipeline import run_masking
 from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.prompts.model import Prompt, PromptSet
 
+from ..conftest import sam2_available
 
-def test_pipeline_produces_mask_with_matching_levels(single_blob_zarr, stub_backend, tmp_path):
+_HAVE_SAM2 = sam2_available()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_pipeline_produces_mask_with_matching_levels(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
     prompts = PromptSet([Prompt(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])])
-    cfg = RunConfig(backend="stub", axes=["z"], level=0)
-    out = run_masking(store, tmp_path / "out.ome.zarr", prompts, cfg, backend=stub_backend)
+    cfg = RunConfig(axes=["z"], level=0)
+    out = run_masking(store, tmp_path / "out.ome.zarr", prompts, cfg)
 
     in_reader = OmeZarrReader(store)
     out_reader = OmeZarrReader(out)

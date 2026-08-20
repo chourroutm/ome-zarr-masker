@@ -1,4 +1,4 @@
-"""Shared test fixtures: a synthetic OME-Zarr v0.5 volume and a deterministic stub backend."""
+"""Shared test fixtures: a synthetic OME-Zarr v0.5 volume."""
 
 from __future__ import annotations
 
@@ -10,10 +10,6 @@ import zarr
 from ome_zarr_models.v05.axes import Axis
 from ome_zarr_models.v05.image import Image
 from pydantic_zarr.v3 import ArraySpec
-from scipy.ndimage import binary_dilation, label
-
-from organ_masker_lite.backends.registry import register_backend
-from organ_masker_lite.prompts.model import PromptSet
 
 
 def write_ome_zarr(path: Path, level0: np.ndarray, n_levels: int = 2) -> Path:
@@ -56,84 +52,26 @@ def two_blob_zarr(tmp_path):
     return path, (6.0, 6.0), (18.0, 18.0), 4
 
 
-class StubBackend:
-    """Deterministic, dependency-light backend: threshold + connected-component selection.
-
-    Foreground = connected components (3D) of the thresholded frame stack that contain a positive
-    point or overlap a box, minus components that contain a negative point.
-    """
-
-    name = "stub"
-
-    def segment_video(self, frames: np.ndarray, prompts: PromptSet) -> np.ndarray:
-        gray = np.asarray(frames)[..., 0]
-        threshold = max(1, int(gray.max()) // 2)
-        candidate = gray >= threshold
-        labels, _n = label(candidate)
-        selected: set[int] = set()
-        deselected: set[int] = set()
-        for p in prompts.prompts:
-            f = p.frame_index
-            for (x, y), lbl in zip(p.point_coords, p.point_labels, strict=True):
-                comp = int(labels[f, int(round(y)), int(round(x))])
-                if comp == 0:
-                    continue
-                (selected if lbl == 1 else deselected).add(comp)
-            if p.box is not None:
-                x0, y0, x1, y1 = p.box.astype(int)
-                for comp in np.unique(labels[f, y0:y1, x0:x1]):
-                    if comp != 0:
-                        selected.add(int(comp))
-        mask = np.isin(labels, list(selected)) if selected else np.zeros_like(candidate, bool)
-        if deselected:
-            mask &= ~np.isin(labels, list(deselected))
-        return mask
-
-
-class StubBackendDilate(StubBackend):
-    """A second deterministic backend: the stub result dilated by one voxel.
-
-    Used to exercise the SAM2-vs-SAM3 comparison harness with two distinct, selectable backends
-    that produce overlapping-but-different masks, without torch/GPU/weights.
-    """
-
-    name = "stub_dilate"
-
-    def segment_video(self, frames: np.ndarray, prompts: PromptSet) -> np.ndarray:
-        base = super().segment_video(frames, prompts)
-        return binary_dilation(base) if base.any() else base
-
-
 @pytest.fixture(autouse=True)
 def isolate_logs(tmp_path, monkeypatch):
     """Redirect per-invocation input logs (feature 002) to a temp dir, never the repo cwd."""
     monkeypatch.setenv("ORGAN_MASKER_LOG_DIR", str(tmp_path / "_logs"))
 
 
-@pytest.fixture
-def stub_backend():
-    return StubBackend()
-
-
-# Register the stubs so CLI/integration tests can select them via --backend.
-register_backend("stub", lambda options: StubBackend())
-register_backend("stub_dilate", lambda options: StubBackendDilate())
-
-
-def real_backend_available(name: str) -> bool:
-    """True only if the named real backend can actually be constructed.
+def sam2_available() -> bool:
+    """True only if the real SAM2 backend can actually be constructed.
 
     Used by ``real_backend`` skip guards. This attempts construction rather than checking
-    ``importlib.util.find_spec(name)``, because a module merely *named* like a backend may be
-    discoverable on the path yet not provide the real predictor (an unrelated ``sam3`` package,
-    a partial install, etc.). Construction performs the same deferred ``torch``/``samN`` import the
-    backend uses and raises ``ImportError`` when the dependency is genuinely unusable, so the guard
-    skips rather than hard-failing in that case.
+    ``importlib.util.find_spec("sam2")``, because a module merely *named* like the backend may be
+    discoverable on the path yet not provide the real predictor (a partial install, etc.).
+    Construction performs the same deferred ``torch``/``sam2`` import the backend uses and raises
+    ``ImportError`` when the dependency is genuinely unusable, so the guard skips rather than
+    hard-failing in that case.
     """
-    from organ_masker_lite.backends.registry import get_backend
+    from organ_masker_lite.sam2 import Sam2Backend
 
     try:
-        get_backend(name)
+        Sam2Backend()
     except ImportError:
         return False
     return True

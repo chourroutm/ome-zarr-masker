@@ -4,9 +4,17 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from organ_masker_lite.cli import main
 
+from ..conftest import sam2_available
 
+_HAVE_SAM2 = sam2_available()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_cli_point_prompts_recorded(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
     prompts = tmp_path / "p.json"
@@ -23,8 +31,6 @@ def test_cli_point_prompts_recorded(single_blob_zarr, tmp_path):
             str(tmp_path / "out.ome.zarr"),
             "--prompts",
             str(prompts),
-            "--backend",
-            "stub",
             "--level",
             "0",
             "--log-dir",
@@ -39,6 +45,8 @@ def test_cli_point_prompts_recorded(single_blob_zarr, tmp_path):
     assert f"point xy=[{float(cx)}, {float(cy)}] label=1" in text
 
 
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_cli_box_prompt_recorded(single_blob_zarr, tmp_path):
     store, _center, frame = single_blob_zarr
     prompts = tmp_path / "p.json"
@@ -53,8 +61,6 @@ def test_cli_box_prompt_recorded(single_blob_zarr, tmp_path):
             str(tmp_path / "out.ome.zarr"),
             "--prompts",
             str(prompts),
-            "--backend",
-            "stub",
             "--level",
             "0",
             "--log-dir",

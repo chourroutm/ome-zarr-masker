@@ -8,26 +8,31 @@ much as the single-axis forward-only result (a broken seeding would shrink the c
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from organ_masker_lite.config import RunConfig
 from organ_masker_lite.engine.pipeline import run_masking
 from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.prompts.model import Prompt, PromptSet
 
+from ..conftest import sam2_available
 
-def _run(store, out, axes, stub_backend):
+_HAVE_SAM2 = sam2_available()
+
+
+def _run(store, out, axes):
     prompts = PromptSet([Prompt(frame_index=4, point_coords=[[8.0, 8.0]], point_labels=[1])])
-    cfg = RunConfig(backend="stub", axes=axes, level=0, combine_rule="majority")
-    return run_masking(store, out, prompts, cfg, backend=stub_backend)
+    cfg = RunConfig(axes=axes, level=0, combine_rule="majority")
+    return run_masking(store, out, prompts, cfg)
 
 
-def test_multiaxis_consensus_at_least_single_axis(single_blob_zarr, stub_backend, tmp_path):
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_multiaxis_consensus_at_least_single_axis(single_blob_zarr, tmp_path):
     store, _center, _frame = single_blob_zarr
 
-    single = OmeZarrReader(
-        _run(store, tmp_path / "single.ome.zarr", ["z"], stub_backend)
-    ).read_level(0)
-    multi_path = _run(store, tmp_path / "multi.ome.zarr", ["z", "y", "x"], stub_backend)
+    single = OmeZarrReader(_run(store, tmp_path / "single.ome.zarr", ["z"])).read_level(0)
+    multi_path = _run(store, tmp_path / "multi.ome.zarr", ["z", "y", "x"])
     multi = OmeZarrReader(multi_path).read_level(0)
 
     # output is valid with the input's level count

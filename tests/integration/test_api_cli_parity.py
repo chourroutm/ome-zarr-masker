@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from organ_masker_lite import OrganMaskPredictor
 from organ_masker_lite.cli import main
 from organ_masker_lite.io.reader import OmeZarrReader
 
+from ..conftest import sam2_available
 
+_HAVE_SAM2 = sam2_available()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_api_and_cli_produce_equivalent_masks(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
 
@@ -27,16 +35,14 @@ def test_api_and_cli_produce_equivalent_masks(single_blob_zarr, tmp_path):
             str(cli_out),
             "--prompts",
             str(prompts_file),
-            "--backend",
-            "stub",
             "--level",
             "0",
         ]
     )
     assert code == 0
 
-    # API path with the same input/prompts/level/backend
-    predictor = OrganMaskPredictor(backend="stub").set_volume(store, level=0)
+    # API path with the same input/prompts/level
+    predictor = OrganMaskPredictor().set_volume(store, level=0)
     predictor.add_points(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
     api_out = predictor.predict(axes=["z"]).save(tmp_path / "api.ome.zarr")
 

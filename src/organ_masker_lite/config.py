@@ -69,7 +69,6 @@ class PostProcessConfig:
 class RunConfig:
     """The complete, reproducible parameterization of a masking run (FR-014)."""
 
-    backend: str = "sam2"
     level: int = COARSEST_LEVEL
     axes: list[str] = field(default_factory=lambda: ["z"])
     direction: str = "forward"
@@ -130,7 +129,7 @@ class RunConfig:
     def to_record(self) -> dict:
         """Serialize the configuration for the reproducibility run-record (FR-014)."""
         return {
-            "backend": self.backend,
+            "backend": "sam2",  # constant: SAM2 is the only segmentation backend
             "level": self.level,
             "axes": list(self.axes),
             "direction": self.direction,

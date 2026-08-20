@@ -1,8 +1,8 @@
-"""SAM2 video-predictor backend adapter.
+"""SAM2 video-predictor adapter — the project's only segmentation implementation.
 
-Imports of ``torch``/``sam2`` are deferred to construction so the package (and its tests with
-the stub backend) work without those heavy, optional dependencies installed. Install with the
-``[sam2]`` extra to use this backend.
+Imports of ``torch``/``sam2`` are deferred to construction so the package works without those
+heavy, optional dependencies installed unless actually segmenting. Install with the ``[sam2]``
+extra to use it.
 
 The predictor is built from a Hydra config name and a checkpoint file (FR-019/FR-020): the
 checkpoint is resolved against the run's model directory and auto-downloaded on first use unless
@@ -20,8 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import RunConfig
-from ..prompts.model import PromptSet
+from .config import RunConfig
+from .prompts.model import PromptSet
 
 #: Default SAM2.1 Hiera-Large variant. The config name is resolved by sam2's bundled Hydra search
 #: path; the checkpoint filename lives in the run's model directory.
@@ -36,17 +36,15 @@ _CHECKPOINT_ENV = "ORGAN_MASKER_SAM2_CHECKPOINT"
 class Sam2Backend:
     """Adapter over SAM2's video predictor (``build_sam2_video_predictor``)."""
 
-    name = "sam2"
-
-    def __init__(self, config: RunConfig | None = None, **_: object):
-        self._config = config if config is not None else RunConfig(backend="sam2")
+    def __init__(self, config: RunConfig | None = None):
+        self._config = config if config is not None else RunConfig()
         try:
             import torch
             from sam2.build_sam import build_sam2_video_predictor
         except Exception as exc:  # noqa: BLE001
             raise ImportError(
-                "the SAM2 backend requires the '[sam2]' extra (torch + sam2). "
-                "Install it, or use a different backend."
+                "SAM2 requires the '[sam2]' extra (torch + sam2). Install it with: "
+                "pip install 'organ-masker-lite[sam2]'"
             ) from exc
         self._torch = torch
         self._build = build_sam2_video_predictor

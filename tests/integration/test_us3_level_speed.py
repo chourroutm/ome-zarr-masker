@@ -2,7 +2,9 @@
 
 Both runs share the same constant overhead (input validation, output-pyramid write); the variable
 work (reading the level and sweeping it) scales with the level's voxel count, so the coarser level
-must finish faster. Timing uses the best of a few repeats to damp scheduler jitter.
+must finish faster. Timing uses the best of a few repeats to damp scheduler jitter. One SAM2
+predictor is built once and reused across every run in this test so checkpoint-load cost (which
+would otherwise dominate and swamp the level-dependent signal) is excluded from the measurement.
 """
 
 from __future__ import annotations
@@ -15,10 +17,17 @@ import pytest
 from organ_masker_lite.config import RunConfig
 from organ_masker_lite.engine.pipeline import run_masking
 from organ_masker_lite.prompts.model import Prompt, PromptSet
+from organ_masker_lite.sam2 import Sam2Backend
 
-from ..conftest import write_ome_zarr
+from ..conftest import sam2_available, write_ome_zarr
 
-pytestmark = pytest.mark.slow
+_HAVE_SAM2 = sam2_available()
+
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.real_backend,
+    pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable"),
+]
 
 
 def _best_runtime(store, prompts, level, backend, tmp_path, tag, repeats=5):
@@ -28,7 +37,7 @@ def _best_runtime(store, prompts, level, backend, tmp_path, tag, repeats=5):
     output-pyramid write) do identical work for both levels, so their floor cancels and the
     level-dependent read+sweep cost drives the comparison.
     """
-    cfg = RunConfig(backend="stub", axes=["z"], level=level)
+    cfg = RunConfig(axes=["z"], level=level)
     run_masking(store, tmp_path / f"{tag}_warmup.ome.zarr", prompts, cfg, backend=backend)
     best = float("inf")
     for i in range(repeats):
@@ -39,7 +48,7 @@ def _best_runtime(store, prompts, level, backend, tmp_path, tag, repeats=5):
     return best
 
 
-def test_coarser_level_is_faster(tmp_path, stub_backend):
+def test_coarser_level_is_faster(tmp_path):
     vol = np.zeros((32, 400, 400), np.uint8)
     vol[8:24, 120:280, 120:280] = 200
     store = write_ome_zarr(
@@ -53,8 +62,9 @@ def test_coarser_level_is_faster(tmp_path, stub_backend):
     coarse_prompts = PromptSet(
         [Prompt(frame_index=8, point_coords=[[100.0, 100.0]], point_labels=[1])]
     )
+    backend = Sam2Backend()
 
-    fine = _best_runtime(store, fine_prompts, 0, stub_backend, tmp_path, "fine")
-    coarse = _best_runtime(store, coarse_prompts, 1, stub_backend, tmp_path, "coarse")
+    fine = _best_runtime(store, fine_prompts, 0, backend, tmp_path, "fine")
+    coarse = _best_runtime(store, coarse_prompts, 1, backend, tmp_path, "coarse")
 
     assert coarse < fine, f"coarse {coarse:.4f}s not faster than fine {fine:.4f}s"

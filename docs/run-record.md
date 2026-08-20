@@ -21,7 +21,7 @@ output.ome.zarr/
 |-------|------|---------|
 | `input` | string | Path to the input OME-Zarr v0.5 store. |
 | `level` | int | Resolved multiscale level the run operated on (the coarsest level if the request used the default). |
-| `config.backend` | string | Segmentation backend (`sam2`, `sam3`, ...). |
+| `config.backend` | string | Always `"sam2"`; recorded for provenance (SAM2 is the only segmentation backend). |
 | `config.level` | int | Requested level (`-1` means "coarsest"); `level` above is the resolved value. |
 | `config.axes` | list[string] | Sweep axes; the first is the prompted axis, the rest are seeded from it (FR-022). |
 | `config.direction` | string | `forward` or `forward_reverse` (FR-006). |
@@ -73,8 +73,7 @@ organ-masker-lite mask input.ome.zarr output.ome.zarr \
 
 ## Reproducing a run
 
-The record is sufficient to reconstruct the command: read `config.backend`, `level`, `config.axes`,
+The record is sufficient to reconstruct the command: read `level`, `config.axes`,
 `config.direction`, `config.combine_rule`, and `config.postprocess` for the flags, and translate
 each `prompts` entry back into a prompt file (`points` and `box` use the same SAM2 convention as the
-input prompt file). Given the same input store and weights, the run is deterministic for a given
-backend.
+input prompt file). Given the same input store and weights, the run is deterministic.

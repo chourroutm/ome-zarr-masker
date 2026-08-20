@@ -13,11 +13,17 @@ import pytest
 from organ_masker_lite import OrganMaskPredictor
 from organ_masker_lite.prompts.model import PromptError
 
+from ..conftest import sam2_available
 
+_HAVE_SAM2 = sam2_available()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_api_predict_logs_prompts_and_exposes_runid(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
     logdir = tmp_path / "logs"
-    predictor = OrganMaskPredictor(backend="stub", log_dir=logdir).set_volume(store, level=0)
+    predictor = OrganMaskPredictor(log_dir=logdir).set_volume(store, level=0)
     predictor.add_points(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
     result = predictor.predict(axes=["z"])
 
@@ -38,7 +44,7 @@ def test_api_predict_logs_prompts_and_exposes_runid(single_blob_zarr, tmp_path):
 def test_failed_api_predict_still_writes_log(single_blob_zarr, tmp_path):
     store, (cx, cy), _frame = single_blob_zarr
     logdir = tmp_path / "logs"
-    predictor = OrganMaskPredictor(backend="stub", log_dir=logdir).set_volume(store, level=0)
+    predictor = OrganMaskPredictor(log_dir=logdir).set_volume(store, level=0)
     predictor.add_points(frame_index=9999, point_coords=[[cx, cy]], point_labels=[1])  # bad frame
     with pytest.raises(PromptError):
         predictor.predict(axes=["z"])

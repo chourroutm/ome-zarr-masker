@@ -4,7 +4,7 @@ Mirrors the structure of the SAM/SAM2 predictor so SAM users adopt it with minim
 
     from organ_masker_lite import OrganMaskPredictor
 
-    predictor = OrganMaskPredictor(backend="sam2")
+    predictor = OrganMaskPredictor()
     predictor.set_volume("input.ome.zarr", level=3)          # mirrors SAM set_image
     predictor.add_points(frame_index=120, point_coords=[[x, y]], point_labels=[1])
     mask = predictor.predict(axes=["z"], direction="forward")
@@ -52,13 +52,11 @@ class OrganMaskPredictor:
 
     def __init__(
         self,
-        backend: str = "sam2",
         model_dir: str | Path | None = None,
         allow_download: bool = True,
         log_dir: str | Path | None = None,
         log_level: str | None = None,
     ):
-        self._backend = backend
         self._model_dir = model_dir
         self._allow_download = allow_download
         self._log_config = LogConfig(
@@ -134,7 +132,6 @@ class OrganMaskPredictor:
         """Sweep, combine, and return a :class:`MaskResult` (equivalent to CLI output, SC-005)."""
         self._require_volume()
         kwargs: dict = {
-            "backend": self._backend,
             "level": self._level,
             "direction": direction,
             "combine_rule": combine_rule,

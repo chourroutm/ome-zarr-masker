@@ -1,8 +1,9 @@
 """US6: interactive masking session (T053, FR-009, FR-011).
 
 The headless session core (prompt placement, preview, export over the shared engine) is verified
-deterministically with the stub backend. The napari GUI is exercised only when napari is installed;
-its absence is covered by asserting a clear, actionable import error.
+against real SAM2. The napari GUI is exercised only when napari is installed; its absence is
+covered by asserting a clear, actionable import error (that check happens before SAM2 is ever
+touched, so it needs no real backend).
 """
 
 from __future__ import annotations
@@ -15,12 +16,17 @@ from organ_masker_lite.interactive import InteractiveSession
 from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.io.validate import validate_ome_zarr
 
+from ..conftest import sam2_available
+
 _HAVE_NAPARI = importlib.util.find_spec("napari") is not None
+_HAVE_SAM2 = sam2_available()
 
 
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_session_preview_updates_and_exports(two_blob_zarr, tmp_path):
     store, (ax, ay), (bx, by), frame = two_blob_zarr
-    session = InteractiveSession(store, backend="stub", level=0)
+    session = InteractiveSession(store, level=0)
 
     # place positive landmarks on both blobs; preview includes blob B
     session.add_positive_point(frame, ax, ay)
@@ -41,9 +47,11 @@ def test_session_preview_updates_and_exports(two_blob_zarr, tmp_path):
     assert OmeZarrReader(out).read_level(0)[frame, int(by), int(bx)] == 0
 
 
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_export_without_explicit_preview_computes_one(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
-    session = InteractiveSession(store, backend="stub", level=0)
+    session = InteractiveSession(store, level=0)
     session.add_positive_point(frame, cx, cy)
 
     out = session.export(tmp_path / "auto.ome.zarr")
@@ -54,7 +62,7 @@ def test_export_without_explicit_preview_computes_one(single_blob_zarr, tmp_path
 @pytest.mark.skipif(_HAVE_NAPARI, reason="napari is installed; the missing-extra path cannot run")
 def test_launch_without_napari_raises_clear_error(single_blob_zarr):
     store, _center, _frame = single_blob_zarr
-    session = InteractiveSession(store, backend="stub", level=0)
+    session = InteractiveSession(store, level=0)
     with pytest.raises(ImportError, match="interactive"):
         session.launch()
 
@@ -64,5 +72,5 @@ def test_launch_without_napari_raises_clear_error(single_blob_zarr):
 def test_launch_smoke_with_napari(single_blob_zarr):
     # When napari is available this constructs the session; full GUI launch needs a display.
     store, _center, _frame = single_blob_zarr
-    session = InteractiveSession(store, backend="stub", level=0)
+    session = InteractiveSession(store, level=0)
     assert session.read_volume().ndim == 3

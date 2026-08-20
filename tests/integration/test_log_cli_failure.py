@@ -28,8 +28,6 @@ def test_failed_cli_run_still_writes_log(single_blob_zarr, tmp_path):
             str(tmp_path / "out.ome.zarr"),
             "--prompts",
             str(prompts),
-            "--backend",
-            "stub",
             "--level",
             "-5",
             "--log-dir",

@@ -3,23 +3,30 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from organ_masker_lite.config import RunConfig
 from organ_masker_lite.engine.pipeline import run_masking
 from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.prompts.model import Prompt, PromptSet
 
+from ..conftest import sam2_available
 
-def test_box_mask_foreground_within_box(single_blob_zarr, stub_backend, tmp_path):
+_HAVE_SAM2 = sam2_available()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_box_mask_foreground_within_box(single_blob_zarr, tmp_path):
     store, _center, frame = single_blob_zarr
     # blob occupies x in [4, 12), y in [4, 12); draw a box that encloses it
     box = [4.0, 4.0, 12.0, 12.0]
     prompts = PromptSet(
         [Prompt(frame_index=frame, point_coords=np.empty((0, 2)), point_labels=[], box=box)]
     )
-    cfg = RunConfig(backend="stub", axes=["z"], level=0)
+    cfg = RunConfig(axes=["z"], level=0)
 
-    out = run_masking(store, tmp_path / "out.ome.zarr", prompts, cfg, backend=stub_backend)
+    out = run_masking(store, tmp_path / "out.ome.zarr", prompts, cfg)
 
     mask = OmeZarrReader(out).read_level(0)
     assert mask.any()

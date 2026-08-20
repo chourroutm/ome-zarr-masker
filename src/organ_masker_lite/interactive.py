@@ -23,7 +23,6 @@ class InteractiveSession:
     def __init__(
         self,
         store_path: str | Path,
-        backend: str = "sam2",
         level: int = COARSEST_LEVEL,
         model_dir: str | Path | None = None,
         allow_download: bool = True,
@@ -33,7 +32,7 @@ class InteractiveSession:
         self._store_path = str(store_path)
         self._level = level
         self._predictor = predictor or OrganMaskPredictor(
-            backend=backend, model_dir=model_dir, allow_download=allow_download
+            model_dir=model_dir, allow_download=allow_download
         )
         self._predictor.set_volume(store_path, level=level)
         # prompt points as (frame_index, x, y, label) with label 1=positive, 0=negative

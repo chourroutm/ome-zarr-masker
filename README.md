@@ -1,9 +1,9 @@
 # organ-masker-lite
 
-Mask organs in OME-Zarr v0.5 volumes with a SAM-family backend. Place a few landmarks on a single
-plane, and organ-masker-lite propagates them across the volume -- treating each axis sweep as a
-"video" of slices for SAM2/SAM3 -- and writes a single binary OME-Zarr v0.5 mask whose pyramid
-matches the input's levels.
+Mask organs in OME-Zarr v0.5 volumes with SAM2. Place a few landmarks on a single plane, and
+organ-masker-lite propagates them across the volume -- treating each axis sweep as a "video" of
+slices for SAM2 -- and writes a single binary OME-Zarr v0.5 mask whose pyramid matches the input's
+levels.
 
 Three entry points share one engine (CLI, Python API, interactive napari session), so they produce
 identical results for identical inputs.
@@ -11,7 +11,7 @@ identical results for identical inputs.
 ## Features
 
 - OME-Zarr v0.5 in, OME-Zarr v0.5 mask out, validated in-process by the bundled `ome-zarr-models`.
-- SAM2 (default) and SAM3 as first-class, interchangeable backends.
+- SAM2 is the only, unconditional segmentation backend -- nothing to select or configure.
 - Single- or multi-axis sweeps with forward or forward-and-reverse propagation; majority / union /
   intersection consensus. In multi-axis runs you prompt one plane and the other axes are seeded
   automatically.
@@ -23,49 +23,19 @@ identical results for identical inputs.
 
 ## Install
 
-Python 3.11+. Install with a backend extra:
+Python 3.11+.
 
 ```bash
-pip install -e ".[sam2]"                 # default backend (torch + sam2)
-pip install -e ".[sam3]"                 # optional second backend
+pip install -e ".[sam2]"                 # SAM2 (torch + sam2)
 pip install -e ".[interactive]"          # optional napari viewer
 pip install -e ".[dev]"                  # tests + linting
 ```
 
 OME-Zarr v0.5 input validation is provided by the bundled `ome-zarr-models` dependency and runs
 in-process, so a plain install is enough -- no validator command needs to be on your `PATH`. A CUDA
-GPU (>= 8 GB) is recommended for the real backends; weights auto-download into `./organ_masker_models`
-on first use (override with `--model-dir` / `ORGAN_MASKER_MODEL_DIR`, or use `--no-download` with
-pre-placed weights for offline use).
-
-### SAM3 backend
-
-The SAM3 backend needs two assets that the published `sam3` package does not bundle, so this
-adapter provisions both for you. No setup is required beyond Hugging Face access:
-
-- **Gated weights.** SAM3's weights live in the gated Hugging Face repo
-  [`facebook/sam3`](https://huggingface.co/facebook/sam3). Request access there (accept the license
-  and wait for approval), then authenticate so the download succeeds:
-
-  ```bash
-  huggingface-cli login          # or: export HF_TOKEN=hf_...
-  ```
-
-  If you are not authenticated, the backend fails fast with guidance instead of a raw 401. To skip
-  the Hub download entirely, point `ORGAN_MASKER_SAM3_CHECKPOINT` at a local weights file (absolute,
-  or relative to the run's model directory).
-
-- **Tokenizer vocab.** SAM3's text encoder needs the CLIP BPE vocab
-  (`bpe_simple_vocab_16e6.txt.gz`). The adapter downloads it into the run's model directory on first
-  use (unless `--no-download` is set). Override the location with `ORGAN_MASKER_SAM3_BPE` (a local
-  path) or the download source with `ORGAN_MASKER_SAM3_BPE_URL`.
-
-| Variable | Purpose |
-|----------|---------|
-| `HF_TOKEN` / `huggingface-cli login` | Authenticate to download the gated `facebook/sam3` weights. |
-| `ORGAN_MASKER_SAM3_CHECKPOINT` | Use a local weights file instead of the Hub download. |
-| `ORGAN_MASKER_SAM3_BPE` | Use a local BPE tokenizer vocab instead of downloading it. |
-| `ORGAN_MASKER_SAM3_BPE_URL` | Override the BPE vocab download source. |
+GPU (>= 8 GB) is recommended; weights auto-download into `./organ_masker_models` on first use
+(override with `--model-dir` / `ORGAN_MASKER_MODEL_DIR`, or use `--no-download` with pre-placed
+weights for offline use).
 
 ## CLI
 
@@ -81,14 +51,13 @@ cat > prompts.json <<'JSON'
 JSON
 
 organ-masker-lite mask input.ome.zarr output.ome.zarr \
-  --prompts prompts.json --backend sam2 --level 3 --axes z --direction forward
+  --prompts prompts.json --level 3 --axes z --direction forward
 ```
 
 Key options:
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| `--backend {sam2,sam3}` | `sam2` | Segmentation backend. |
 | `--level INT` | coarsest | Pyramid level to run on. |
 | `--axes AXES` | `z` | Comma-separated sweep axes; the first is the prompted axis. |
 | `--direction {forward,forward_reverse}` | `forward` | Propagation mode. |
@@ -136,7 +105,7 @@ The API mirrors the SAM/SAM2 predictor structure:
 ```python
 from organ_masker_lite import OrganMaskPredictor
 
-p = OrganMaskPredictor(backend="sam2")
+p = OrganMaskPredictor()
 p.set_volume("input.ome.zarr", level=3)            # mirrors SAM set_image
 p.add_points(frame_index=120, point_coords=[[340, 512]], point_labels=[1])
 mask = p.predict(axes=["z"], direction="forward")  # returns a MaskResult
@@ -154,7 +123,7 @@ read `mask.run_id` to correlate the result with its log file and saved `run_reco
 
 ```bash
 pip install -e ".[interactive]"
-organ-masker-lite interactive input.ome.zarr --backend sam2 --level 3
+organ-masker-lite interactive input.ome.zarr --level 3
 ```
 
 Place landmarks on the points layer, press `p` to preview the mask and `e` to export it. The session
@@ -168,6 +137,6 @@ ruff check src tests && ruff format --check src tests
 pytest                       # add -m "not slow" to skip the timing/benchmark tests
 ```
 
-Real-backend tests are marked `real_backend` and are skipped unless torch + sam2/sam3 (and, for the
-interactive smoke test, napari) are installed. A deterministic stub backend exercises the full
-engine, IO, prompts, and CLI/API without a GPU.
+Tests that exercise real segmentation are marked `real_backend` and are skipped unless torch + sam2
+(and, for the interactive smoke test, napari) are installed and a GPU with SAM2 weights is
+available. There is no CPU-only stand-in; these tests verify the actual, shipped SAM2 path.

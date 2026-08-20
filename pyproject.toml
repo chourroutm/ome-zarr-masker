@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "organ-masker-lite"
 version = "0.0.1"
-description = "Mask organs in OME-Zarr v0.5 volumes with a SAM-family backend."
+description = "Mask organs in OME-Zarr v0.5 volumes with SAM2."
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
@@ -16,7 +16,6 @@ dependencies = [
 
 [project.optional-dependencies]
 sam2 = ["torch", "sam2"]
-sam3 = ["torch", "sam3"]
 interactive = ["napari"]
 dev = ["pytest", "ruff"]
 

@@ -10,14 +10,13 @@ from pathlib import Path
 
 import numpy as np
 
-from ..backends.base import VideoSegmenterBackend
-from ..backends.registry import get_backend
 from ..config import RunConfig
 from ..io.reader import OmeZarrReader, ReaderError
 from ..io.validate import validate_ome_zarr
 from ..io.writer import write_mask
 from ..postprocess.morphology import postprocess_mask
 from ..prompts.model import PromptSet
+from ..sam2 import Sam2Backend
 from .combine import VoteAccumulator
 from .sweep import run_sweep, seeds_from_mask
 
@@ -65,14 +64,18 @@ def compute_mask(
     config: RunConfig,
     *,
     reader: OmeZarrReader | None = None,
-    backend: VideoSegmenterBackend | None = None,
+    backend: Sam2Backend | None = None,
     progress: Callable[[str], None] | None = None,
     run_id: str | None = None,
 ) -> MaskComputation:
     """Validate, sweep, and combine into a consensus mask (no output written).
 
     Shared by the CLI (``run_masking``) and the programmatic API so both produce identical masks
-    and run records for identical inputs/prompts (SC-005). ``reader``/``backend`` may be injected.
+    and run records for identical inputs/prompts (SC-005). ``reader`` may be injected (tests).
+    Segmentation always uses SAM2; ``backend`` may optionally be an already-constructed
+    :class:`Sam2Backend` so callers making several runs (e.g. benchmarks) reuse one loaded
+    predictor instead of paying checkpoint-load cost on every call. This is a reuse seam, not a
+    selector -- there is no other backend to pass.
     """
 
     def report(msg: str) -> None:
@@ -102,7 +105,7 @@ def compute_mask(
 
     if backend is None:
         try:
-            backend = get_backend(config.backend, config=config)
+            backend = Sam2Backend(config=config)
         except Exception as exc:  # noqa: BLE001
             raise PipelineError(str(exc)) from exc
 
@@ -167,14 +170,15 @@ def run_masking(
     config: RunConfig,
     *,
     reader: OmeZarrReader | None = None,
-    backend: VideoSegmenterBackend | None = None,
+    backend: Sam2Backend | None = None,
     progress: Callable[[str], None] | None = None,
     run_id: str | None = None,
 ) -> Path:
     """Run an end-to-end masking pipeline and write an OME-Zarr v0.5 mask.
 
-    ``reader``/``backend`` may be injected (tests); otherwise they are constructed from
-    ``input_path`` and ``config``. ``run_id`` is embedded in the run record for log correlation.
+    ``reader``/``backend`` may be injected; otherwise they are constructed from ``input_path``/
+    ``config``. Segmentation always uses SAM2. ``run_id`` is embedded in the run record for log
+    correlation.
     """
     comp = compute_mask(
         input_path,

@@ -27,7 +27,7 @@ def test_explicit_model_dir_wins(tmp_path, monkeypatch):
 
 
 def test_to_record_round_trips_key_fields():
-    cfg = RunConfig(backend="sam2", level=2, axes=["z", "y"], combine_rule="majority")
+    cfg = RunConfig(level=2, axes=["z", "y"], combine_rule="majority")
     rec = cfg.to_record()
     assert rec["backend"] == "sam2"
     assert rec["level"] == 2

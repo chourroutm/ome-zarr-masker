@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import pytest
+
 from organ_masker_lite.config import RunConfig
 from organ_masker_lite.engine.pipeline import run_masking
 from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.prompts.model import Prompt, PromptSet
 
+from ..conftest import sam2_available
 
-def test_exclusion_point_removes_region(two_blob_zarr, stub_backend, tmp_path):
+_HAVE_SAM2 = sam2_available()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_exclusion_point_removes_region(two_blob_zarr, tmp_path):
     store, (ax, ay), (bx, by), frame = two_blob_zarr
     # select both blobs, then exclude blob B with a negative point
     prompts = PromptSet(
@@ -20,9 +28,9 @@ def test_exclusion_point_removes_region(two_blob_zarr, stub_backend, tmp_path):
             )
         ]
     )
-    cfg = RunConfig(backend="stub", axes=["z"], level=0)
+    cfg = RunConfig(axes=["z"], level=0)
 
-    out = run_masking(store, tmp_path / "out.ome.zarr", prompts, cfg, backend=stub_backend)
+    out = run_masking(store, tmp_path / "out.ome.zarr", prompts, cfg)
 
     mask = OmeZarrReader(out).read_level(0)
     assert mask.any()
