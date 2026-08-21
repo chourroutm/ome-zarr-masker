@@ -34,6 +34,17 @@ def _junk_store(tmp_path):
     return junk
 
 
+def _v04_store(tmp_path):
+    """A minimal OME-Zarr v0.4 store: Zarr format 2 (.zgroup/.zattrs), no zarr.json."""
+    store = tmp_path / "v04.ome.zarr"
+    store.mkdir()
+    (store / ".zgroup").write_text('{"zarr_format": 2}')
+    (store / ".zattrs").write_text(
+        '{"multiscales": [{"version": "0.4", "axes": [], "datasets": []}]}'
+    )
+    return store
+
+
 # --- Feature 001 behaviour preserved (C-VAL-3, C-VAL-4, C-VAL-6) ---------------------------------
 
 
@@ -49,6 +60,17 @@ def test_missing_path_raises(tmp_path):
 def test_non_ome_store_raises(tmp_path):
     with pytest.raises(ValidationError):
         validate_ome_zarr(_junk_store(tmp_path))
+
+
+def test_v04_store_raises_clear_version_mismatch_error(tmp_path):
+    """A v0.4/Zarr-format-2 store must fail with a message naming the actual version and
+    format, not the raw 'no group at path ...' error from zarr's v3-only group lookup."""
+    with pytest.raises(ValidationError) as excinfo:
+        validate_ome_zarr(_v04_store(tmp_path))
+    message = str(excinfo.value)
+    assert "v0.4" in message
+    assert "Zarr format 2" in message
+    assert "v0.5" in message
 
 
 # --- US1: validate from a plain install, no validator command on PATH ----------------------------
