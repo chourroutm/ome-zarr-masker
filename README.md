@@ -126,8 +126,9 @@ pip install -e ".[interactive]"
 organ-masker-lite interactive input.ome.zarr --level 3
 ```
 
-Place landmarks on the points layer, press `p` to preview the mask and `e` to export it. The session
-runs on the same engine as the CLI and API.
+Place landmarks on the points layer -- new points default to positive (green); select one or more
+and press `n` to mark them negative/exclusion (red), or `y` to mark them positive again. Press `p`
+to preview the mask and `e` to export it. The session runs on the same engine as the CLI and API.
 
 ## Development
 

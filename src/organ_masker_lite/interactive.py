@@ -95,9 +95,11 @@ class InteractiveSession:
     def launch(self) -> None:  # pragma: no cover - requires napari + a display
         """Open a napari viewer wired to this session (requires the ``[interactive]`` extra).
 
-        Adds the volume as an image layer and a points layer for landmarks; pressing ``p`` previews
-        the mask for the current points (positive vs negative read from each point's ``positive``
-        feature) and ``e`` exports it. All masking goes through the shared engine (FR-011).
+        Adds the volume as an image layer and a points layer for landmarks. New points default to
+        positive (green); select one or more points and press ``n`` to flip them to negative/
+        exclusion (red), or ``y`` to flip them back to positive. Pressing ``p`` previews the mask
+        for the current points and ``e`` exports it. All masking goes through the shared engine
+        (FR-011).
         """
         napari = _require_napari()
 
@@ -107,6 +109,29 @@ class InteractiveSession:
         points_layer = viewer.add_points(
             name="prompts", ndim=3, features={"positive": np.array([], dtype=bool)}
         )
+        # New points are positive by default (the common case); napari's own default for an
+        # empty bool feature column is False, which would silently make every clicked point an
+        # exclusion point unless overridden here.
+        points_layer.feature_defaults["positive"] = True
+        points_layer.face_color_cycle = {True: "lime", False: "red"}
+        points_layer.face_color = "positive"
+
+        def _set_selected_positive(positive: bool) -> None:
+            selected = list(points_layer.selected_data)
+            if not selected:
+                return
+            values = points_layer.features["positive"].to_numpy().copy()
+            values[selected] = positive
+            points_layer.features["positive"] = values
+            points_layer.refresh_colors()
+
+        @viewer.bind_key("n")
+        def _mark_negative(_viewer):  # noqa: ANN001
+            _set_selected_positive(False)
+
+        @viewer.bind_key("y")
+        def _mark_positive(_viewer):  # noqa: ANN001
+            _set_selected_positive(True)
 
         def _sync_points_from_layer() -> None:
             self.clear_points()
