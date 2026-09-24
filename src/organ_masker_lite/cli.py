@@ -76,6 +76,11 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="erosion_radius",
         help="Erosion radius in voxels (default: 0)",
     )
+    mask.add_argument(
+        "--invert",
+        action="store_true",
+        help="Swap the output mask's values: background becomes 1, organ becomes 0 (default: off)",
+    )
     mask.add_argument("--overwrite", action="store_true", help="Overwrite an existing output")
     mask.add_argument("--verbose", action="store_true", help="Print progress to stderr")
     _add_log_options(mask)
@@ -132,6 +137,7 @@ def _cmd_mask(args: argparse.Namespace) -> int:
                     fill_holes=args.fill_holes,
                     dilation_radius=args.dilation_radius,
                     erosion_radius=args.erosion_radius,
+                    invert=args.invert,
                 ),
                 overwrite=args.overwrite,
             )
