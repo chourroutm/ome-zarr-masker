@@ -70,6 +70,8 @@ class InteractiveSession:
         self._predictor.set_volume(store_path, level=level)
         # prompt points as (frame_index, x, y, label) with label 1=positive, 0=negative
         self._points: list[tuple[int, float, float, int]] = []
+        # at most one box per frame (feature 006, FR-010): frame_index -> [x0, y0, x1, y1]
+        self._boxes: dict[int, np.ndarray] = {}
         self._preview: MaskResult | None = None
         self._last_preview_kwargs: dict = {}
 
@@ -89,6 +91,17 @@ class InteractiveSession:
 
     def clear_points(self) -> InteractiveSession:
         self._points = []
+        self._preview = None
+        return self
+
+    def add_box(self, frame_index: int, box) -> InteractiveSession:  # noqa: ANN001
+        """Set (replacing any existing) the box prompt for ``frame_index`` (feature 006, FR-010)."""
+        self._boxes[int(frame_index)] = np.asarray(box, dtype=float)
+        self._preview = None
+        return self
+
+    def clear_boxes(self) -> InteractiveSession:
+        self._boxes = {}
         self._preview = None
         return self
 
@@ -113,8 +126,16 @@ class InteractiveSession:
             coords, labels = by_frame.setdefault(frame, ([], []))
             coords.append([x, y])
             labels.append(label)
-        for frame, (coords, labels) in sorted(by_frame.items()):
-            self._predictor.add_points(frame_index=frame, point_coords=coords, point_labels=labels)
+        # Merge each frame's points and box into ONE add_points(..., box=...) call (feature 006,
+        # research R2): SAM2 silently drops one or the other if they're two separate calls.
+        for frame in sorted(set(by_frame) | set(self._boxes)):
+            coords, labels = by_frame.get(frame, ([], []))
+            self._predictor.add_points(
+                frame_index=frame,
+                point_coords=coords,
+                point_labels=labels,
+                box=self._boxes.get(frame),
+            )
         # Remembered so export() can force a full recompute (frame_range=None) while preserving
         # whatever axes/direction/combine_rule/postprocess the caller last configured (FR-008).
         self._last_preview_kwargs = {
@@ -152,17 +173,22 @@ class InteractiveSession:
     def launch(self) -> None:  # pragma: no cover - requires napari + a display
         """Open a napari viewer wired to this session (requires the ``[interactive]`` extra).
 
-        Adds the volume as an image layer and a points layer for landmarks. New points default to
-        positive (green); select one or more points and press ``n`` to flip them to negative/
-        exclusion (red), or ``y`` to flip them back to positive. Three preview shortcuts (feature
-        007): ``s`` (single-slice, current frame only), ``f`` (few-slices, a fixed ±5-frame window
-        around the current slice), and ``p`` (whole-volume, gated behind a confirmation since it's
-        the expensive one). ``s``/``f`` run asynchronously with a status-bar busy indicator and
-        ignore a repeat trigger while already computing (FR-010/FR-011). ``e`` exports the full
-        whole-volume mask, always freshly computed regardless of the last preview mode (FR-008).
-        All masking goes through the shared engine.
+        Adds the volume as an image layer and three prompt layers (feature 006):
+        ``positive-points`` (lime crosses), ``negative-points`` (red discs), and ``positive-box``
+        (a translucent, lime-outlined rectangle-only layer). New points default to positive; select
+        one or more and press ``n``/``y`` to flip them between the two point layers -- the flip
+        leaves the point selected in its new layer so an immediate opposite keypress flips it right
+        back, and switching which layer you're interacting with clears the layer you left so a
+        forgotten selection can't bleed into a later keypress (FR-003/004/004a/004b). Three preview
+        shortcuts (feature 007): ``s`` (single-slice, current frame only), ``f`` (few-slices, a
+        fixed ±5-frame window around the current slice), and ``p`` (whole-volume, gated behind a
+        confirmation since it's the expensive one). ``s``/``f`` run asynchronously with a
+        status-bar busy indicator and ignore a repeat trigger while already computing
+        (FR-010/FR-011). ``e`` exports the full whole-volume mask, always freshly computed
+        regardless of the last preview mode (FR-008). All masking goes through the shared engine.
         """
         from napari.qt.threading import thread_worker
+        from qtpy.QtCore import QTimer
         from qtpy.QtWidgets import QMessageBox
 
         napari = _require_napari()
@@ -170,38 +196,113 @@ class InteractiveSession:
         volume = self.read_volume()
         viewer = napari.Viewer()
         viewer.add_image(volume, name="volume")
-        points_layer = viewer.add_points(
-            name="prompts", ndim=3, features={"positive": np.array([], dtype=bool)}
-        )
-        # New points are positive by default (the common case); napari's own default for an
-        # empty bool feature column is False, which would silently make every clicked point an
-        # exclusion point unless overridden here.
-        points_layer.feature_defaults["positive"] = True
-        points_layer.face_color_cycle = {True: "lime", False: "red"}
-        points_layer.face_color = "positive"
 
-        def _set_selected_positive(positive: bool) -> None:
-            selected = list(points_layer.selected_data)
+        positive_layer = viewer.add_points(
+            name="positive-points",
+            ndim=3,
+            symbol="cross",
+            size=7,
+            face_color="lime",
+            border_width=0,
+        )
+        negative_layer = viewer.add_points(
+            name="negative-points",
+            ndim=3,
+            symbol="disc",
+            size=6,
+            face_color="red",
+            border_width=0,
+        )
+        box_layer = viewer.add_shapes(
+            name="positive-box",
+            ndim=3,
+            blending="translucent_no_depth",
+            opacity=1.0,
+            edge_color="lime",
+            edge_width=1,
+            face_color="#00000000",
+        )
+
+        def _enforce_box_layer_rules(event=None) -> None:  # noqa: ANN001, ARG001
+            """Rectangle-only, at most one box per frame (feature 006, FR-007/FR-010).
+
+            Deferred via ``QTimer.singleShot(0, ...)`` rather than mutating ``box_layer``
+            synchronously inside its own ``data`` event handler: doing it synchronously causes
+            napari/Qt to re-enter its own layer-change machinery and blow the recursion limit
+            (confirmed while implementing this feature). A zero-delay deferral runs right after
+            the current event finishes, imperceptible to the user, and avoids the reentrancy.
+            """
+
+            def _fix() -> None:
+                shape_types = list(box_layer.shape_type)
+                non_rectangle = [i for i, t in enumerate(shape_types) if t != "rectangle"]
+                if non_rectangle:
+                    box_layer.selected_data = set(non_rectangle)
+                    box_layer.remove_selected()
+                    return  # re-triggers this handler via the data event
+
+                data = box_layer.data
+                if len(data) < 2:
+                    return
+                last_index_per_frame: dict[int, int] = {}
+                for i, verts in enumerate(data):
+                    frame = int(round(float(verts[0][0])))
+                    last_index_per_frame[frame] = i  # a later index is the newest draw/edit
+                keep = set(last_index_per_frame.values())
+                stale = [i for i in range(len(data)) if i not in keep]
+                if stale:
+                    box_layer.selected_data = set(stale)
+                    box_layer.remove_selected()
+
+            QTimer.singleShot(0, _fix)
+
+        box_layer.events.data.connect(_enforce_box_layer_rules)
+
+        def _flip_selected(source, dest) -> None:  # noqa: ANN001
+            selected = list(source.selected_data)
             if not selected:
                 return
-            values = points_layer.features["positive"].to_numpy().copy()
-            values[selected] = positive
-            points_layer.features["positive"] = values
-            points_layer.refresh_colors()
+            moved_coords = source.data[selected].copy()
+            source.remove_selected()
+            dest.add(moved_coords)  # napari auto-selects newly added points (FR-004b)
 
         @viewer.bind_key("n")
         def _mark_negative(_viewer):  # noqa: ANN001
-            _set_selected_positive(False)
+            _flip_selected(positive_layer, negative_layer)
 
         @viewer.bind_key("y")
         def _mark_positive(_viewer):  # noqa: ANN001
-            _set_selected_positive(True)
+            _flip_selected(negative_layer, positive_layer)
+
+        _previously_active = viewer.layers.selection.active
+
+        def _on_active_layer_changed(event) -> None:  # noqa: ANN001
+            nonlocal _previously_active
+            old, new = _previously_active, event.value
+            if old is not None and old is not new and old in (positive_layer, negative_layer):
+                old.selected_data = set()  # FR-004a: don't let a stale selection bleed forward
+            _previously_active = new
+
+        viewer.layers.selection.events.active.connect(_on_active_layer_changed)
 
         def _sync_points_from_layer() -> None:
             self.clear_points()
-            positive = points_layer.features.get("positive", [])
-            for (z, y, x), pos in zip(points_layer.data, positive, strict=False):
-                self.add_point(int(round(z)), float(x), float(y), positive=bool(pos))
+            for z, y, x in positive_layer.data:
+                self.add_point(int(round(z)), float(x), float(y), positive=True)
+            for z, y, x in negative_layer.data:
+                self.add_point(int(round(z)), float(x), float(y), positive=False)
+
+        def _sync_boxes_from_layer() -> None:
+            self.clear_boxes()
+            for verts in box_layer.data:
+                frame = int(round(float(verts[0][0])))
+                y0, x0 = float(verts[:, 1].min()), float(verts[:, 2].min())
+                y1, x1 = float(verts[:, 1].max()), float(verts[:, 2].max())
+                self.add_box(frame, [x0, y0, x1, y1])
+
+        def _sync_prompts_from_layers() -> None:
+            _sync_points_from_layer()
+            _sync_boxes_from_layer()
 
         n_frames = volume.shape[0]
         busy_guard = _PreviewBusyGuard()
@@ -225,9 +326,11 @@ class InteractiveSession:
         def _run_async_preview(frame_range: tuple[int, int], busy_message: str) -> None:
             if not busy_guard.try_start():  # FR-011: ignore a trigger while one is in flight
                 return
-            _sync_points_from_layer()
+            _sync_prompts_from_layers()
             start, end = frame_range
-            if not any(start <= p[0] <= end for p in self._points):
+            has_point = any(start <= p[0] <= end for p in self._points)
+            has_box = any(start <= f <= end for f in self._boxes)
+            if not (has_point or has_box):
                 busy_guard.finish()
                 viewer.status = "preview: no prompts on the requested frame(s)"
                 return
@@ -271,13 +374,13 @@ class InteractiveSession:
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
-            _sync_points_from_layer()
+            _sync_prompts_from_layers()
             result = self.preview(axes=["z"])
             _merge_into_preview_layer(result.array, (0, n_frames - 1))
 
         @viewer.bind_key("e")
         def _export(_viewer):  # noqa: ANN001
-            _sync_points_from_layer()
+            _sync_prompts_from_layers()
             self.export("interactive_output.ome.zarr", overwrite=True)
 
         napari.run()
