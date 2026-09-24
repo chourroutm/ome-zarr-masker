@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 
+import numpy as np
 import pytest
 
 from organ_masker_lite.interactive import InteractiveSession
@@ -57,6 +58,30 @@ def test_export_without_explicit_preview_computes_one(single_blob_zarr, tmp_path
     out = session.export(tmp_path / "auto.ome.zarr")
     validate_ome_zarr(out)
     assert OmeZarrReader(out).read_level(0)[frame, int(cy), int(cx)] == 1
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_export_forces_full_recompute_even_with_cached_partial_preview(single_blob_zarr, tmp_path):
+    """feature 007, FR-008/C-PV-9: export() must never reuse a cached partial preview."""
+    store, (cx, cy), frame = single_blob_zarr
+    session = InteractiveSession(store, level=0)
+    session.add_positive_point(frame, cx, cy)
+
+    # a narrow, single-slice-equivalent preview leaves self._preview holding a PARTIAL result
+    partial = session.preview(axes=["z"], frame_range=(frame, frame)).array
+    assert partial[frame].any()
+    assert not partial[:frame].any()
+    assert not partial[frame + 1 :].any()
+
+    out = session.export(tmp_path / "safe.ome.zarr")
+    validate_ome_zarr(out)
+    exported = OmeZarrReader(out).read_level(0)
+
+    # export MUST have recomputed the full whole-volume result, not reused the partial one
+    full = session.preview(axes=["z"]).array
+    assert np.array_equal(exported, full.astype(exported.dtype))
+    assert not np.array_equal(exported, partial.astype(exported.dtype))
 
 
 @pytest.mark.skipif(_HAVE_NAPARI, reason="napari is installed; the missing-extra path cannot run")

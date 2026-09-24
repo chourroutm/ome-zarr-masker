@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from organ_masker_lite.config import MODEL_DIR_ENV, PostProcessConfig, RunConfig
 
 
@@ -45,3 +47,17 @@ def test_to_record_includes_invert():
     assert RunConfig().to_record()["postprocess"]["invert"] is False
     cfg = RunConfig(postprocess=PostProcessConfig(invert=True))
     assert cfg.to_record()["postprocess"]["invert"] is True
+
+
+def test_frame_range_defaults_to_none():
+    assert RunConfig().frame_range is None
+
+
+def test_frame_range_rejects_start_after_end():
+    with pytest.raises(ValueError):
+        RunConfig(frame_range=(5, 2))
+
+
+def test_frame_range_rejects_negative_bounds():
+    with pytest.raises(ValueError):
+        RunConfig(frame_range=(-1, 2))
