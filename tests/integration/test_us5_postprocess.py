@@ -95,3 +95,34 @@ def test_default_fillholes_disabled_and_exact_morphology(tmp_path):
     assert _run(store, ero_out, prompts, "--no-fill-holes", "--erode", "1") == 0
     ero = OmeZarrReader(ero_out).read_level(0).astype(bool)
     assert np.array_equal(ero, ndimage.binary_erosion(raw, iterations=1))
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_invert_is_exact_complement_end_to_end(tmp_path):
+    store = _hollow_store(tmp_path)
+    prompts = _prompts(tmp_path / "p.json")
+
+    normal_out = tmp_path / "normal.ome.zarr"
+    assert _run(store, normal_out, prompts) == 0
+    normal = OmeZarrReader(normal_out).read_level(0)
+    assert normal.dtype == np.uint8
+
+    inverted_out = tmp_path / "inverted.ome.zarr"
+    assert _run(store, inverted_out, prompts, "--invert") == 0
+    inverted = OmeZarrReader(inverted_out).read_level(0)
+    assert inverted.dtype == np.uint8
+    assert np.array_equal(inverted, 1 - normal)
+
+    # invert is applied after dilation (FR-004): the dilated organ region is identical either way,
+    # only the final polarity differs.
+    dil_out = tmp_path / "dil.ome.zarr"
+    assert _run(store, dil_out, prompts, "--no-fill-holes", "--dilate", "1") == 0
+    dil = OmeZarrReader(dil_out).read_level(0)
+
+    dil_inverted_out = tmp_path / "dil_inverted.ome.zarr"
+    assert (
+        _run(store, dil_inverted_out, prompts, "--no-fill-holes", "--dilate", "1", "--invert") == 0
+    )
+    dil_inverted = OmeZarrReader(dil_inverted_out).read_level(0)
+    assert np.array_equal(dil_inverted, 1 - dil)

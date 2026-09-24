@@ -57,6 +57,21 @@ def test_usage_error_exits_two():
     assert exc.value.code == 2
 
 
+def test_invert_flag_documented_in_help(capsys):
+    """C-CLI-8: `mask --help` describes --invert."""
+    with pytest.raises(SystemExit) as exc:
+        main(["mask", "--help"])
+    assert exc.value.code == 0
+    assert "--invert" in capsys.readouterr().out
+
+
+def test_interactive_invert_flag_rejected():
+    """C-CLI-9: --invert is scoped to `mask`; `interactive` rejects it as unrecognized."""
+    with pytest.raises(SystemExit) as exc:
+        main(["interactive", "in.ome.zarr", "--invert"])
+    assert exc.value.code == 2
+
+
 def test_backend_flag_rejected(valid_input, tmp_path):
     """C-CLI-6: --backend no longer exists; argparse rejects it as unrecognized."""
     prompts = _single_point_prompts(tmp_path)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from organ_masker_lite.config import MODEL_DIR_ENV, RunConfig
+from organ_masker_lite.config import MODEL_DIR_ENV, PostProcessConfig, RunConfig
 
 
 def test_default_model_dir_is_cwd_subdir(tmp_path, monkeypatch):
@@ -34,3 +34,14 @@ def test_to_record_round_trips_key_fields():
     assert rec["axes"] == ["z", "y"]
     assert rec["allow_download"] is True
     assert "model_dir" in rec
+
+
+def test_postprocess_invert_defaults_off_and_is_not_noop_when_set():
+    assert PostProcessConfig().invert is False
+    assert PostProcessConfig(invert=True).is_noop is False
+
+
+def test_to_record_includes_invert():
+    assert RunConfig().to_record()["postprocess"]["invert"] is False
+    cfg = RunConfig(postprocess=PostProcessConfig(invert=True))
+    assert cfg.to_record()["postprocess"]["invert"] is True
