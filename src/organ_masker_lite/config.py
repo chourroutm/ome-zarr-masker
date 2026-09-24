@@ -83,6 +83,7 @@ class RunConfig:
     model_dir: Path | None = None
     allow_download: bool = True
     overwrite: bool = False
+    frame_range: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         # ``level`` is either the COARSEST sentinel or a concrete non-negative index (FR-003).
@@ -91,6 +92,12 @@ class RunConfig:
                 f"invalid level {self.level}; use a non-negative index or "
                 f"{COARSEST_LEVEL} for the coarsest (default) level"
             )
+        if self.frame_range is not None:
+            start, end = self.frame_range
+            if start < 0 or end < start:
+                raise ValueError(
+                    f"invalid frame_range {self.frame_range}; expected 0 <= start <= end"
+                )
 
     def resolved_model_dir(self) -> Path:
         """Resolve the model directory: explicit > env var > default (cwd subdir) (FR-019)."""
@@ -148,4 +155,5 @@ class RunConfig:
             },
             "model_dir": str(self.resolved_model_dir()),
             "allow_download": self.allow_download,
+            "frame_range": list(self.frame_range) if self.frame_range is not None else None,
         }
