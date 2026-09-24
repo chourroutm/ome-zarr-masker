@@ -9,13 +9,17 @@ touched, so it needs no real backend).
 from __future__ import annotations
 
 import importlib.util
+import json
 
 import numpy as np
 import pytest
 
+from organ_masker_lite.config import RunConfig
+from organ_masker_lite.engine.pipeline import compute_mask
 from organ_masker_lite.interactive import InteractiveSession
 from organ_masker_lite.io.reader import OmeZarrReader
 from organ_masker_lite.io.validate import validate_ome_zarr
+from organ_masker_lite.prompts.model import load_prompt_file
 
 from ..conftest import sam2_available
 
@@ -82,6 +86,62 @@ def test_export_forces_full_recompute_even_with_cached_partial_preview(single_bl
     full = session.preview(axes=["z"]).array
     assert np.array_equal(exported, full.astype(exported.dtype))
     assert not np.array_equal(exported, partial.astype(exported.dtype))
+
+
+def test_add_box_replaces_existing_box_for_same_frame(single_blob_zarr):
+    """feature 006, FR-010/C-UI-14: at most one box per frame; the newest replaces the old."""
+    store, _center, frame = single_blob_zarr
+    session = InteractiveSession(store, level=0)
+    session.add_box(frame, [0, 0, 4, 4])
+    session.add_box(frame, [1, 1, 5, 5])
+    assert len(session._boxes) == 1
+    assert session._boxes[frame].tolist() == [1, 1, 5, 5]
+
+    session.clear_boxes()
+    assert session._boxes == {}
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_box_only_prompt_reaches_the_masking_engine(single_blob_zarr):
+    """feature 006: a box with no points still produces a mask (OrganMaskPredictor.add_box path)."""
+    store, (cx, cy), frame = single_blob_zarr
+    session = InteractiveSession(store, level=0)
+    session.add_box(frame, [cx - 5, cy - 5, cx + 5, cy + 5])
+    result = session.preview(axes=["z"])
+    assert result.array[frame].any()
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_interactive_point_and_box_match_equivalent_cli_prompt(single_blob_zarr, tmp_path):
+    """feature 006, SC-004/C-UI-15: interactive point+box on one frame == CLI prompt-file both."""
+    store, (cx, cy), frame = single_blob_zarr
+    box = [cx - 6, cy - 6, cx + 6, cy + 6]
+
+    session = InteractiveSession(store, level=0)
+    session.add_positive_point(frame, cx, cy)
+    session.add_box(frame, box)
+    interactive_mask = session.preview(axes=["z"]).array
+
+    prompts_path = tmp_path / "prompts.json"
+    prompts_path.write_text(
+        json.dumps(
+            {
+                "objects": [
+                    {
+                        "obj_id": 0,
+                        "points": [{"frame": frame, "xy": [cx, cy], "label": 1}],
+                        "box": {"frame": frame, "xyxy": box},
+                    }
+                ]
+            }
+        )
+    )
+    prompts = load_prompt_file(prompts_path)
+    cli_result = compute_mask(store, prompts, RunConfig(axes=["z"], level=0))
+
+    assert np.array_equal(interactive_mask.astype("uint8"), cli_result.consensus.astype("uint8"))
 
 
 @pytest.mark.skipif(_HAVE_NAPARI, reason="napari is installed; the missing-extra path cannot run")
