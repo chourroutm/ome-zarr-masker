@@ -128,8 +128,13 @@ class OrganMaskPredictor:
         direction: str = "forward",
         combine_rule: str = "majority",
         postprocess: PostProcessConfig | None = None,
+        frame_range: tuple[int, int] | None = None,
     ) -> MaskResult:
-        """Sweep, combine, and return a :class:`MaskResult` (equivalent to CLI output, SC-005)."""
+        """Sweep, combine, and return a :class:`MaskResult` (equivalent to CLI output, SC-005).
+
+        ``frame_range`` restricts the sweep to an inclusive range of frames on the prompted axis
+        (feature 007); ``None`` (default) sweeps the full axis, unchanged from before.
+        """
         self._require_volume()
         kwargs: dict = {
             "level": self._level,
@@ -138,6 +143,7 @@ class OrganMaskPredictor:
             "postprocess": postprocess or PostProcessConfig(),
             "model_dir": Path(self._model_dir) if self._model_dir is not None else None,
             "allow_download": self._allow_download,
+            "frame_range": frame_range,
         }
         if axes is not None:
             kwargs["axes"] = list(axes)

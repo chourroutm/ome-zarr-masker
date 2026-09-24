@@ -17,6 +17,39 @@ from .config import COARSEST_LEVEL, PostProcessConfig
 from .io.reader import OmeZarrReader
 
 
+class _PreviewBusyGuard:
+    """Tracks whether a single-slice/few-slices preview computation is in flight (feature 007).
+
+    Pure and display-independent -- unlike the rest of :meth:`InteractiveSession.launch`'s GUI
+    wiring, this is unit-tested directly (research R4). Guards FR-011: while busy, a new preview
+    trigger is a no-op rather than being queued or cancelling the in-flight one.
+    """
+
+    def __init__(self) -> None:
+        self.busy = False
+
+    def try_start(self) -> bool:
+        """Return ``True`` and mark busy if idle; return ``False`` (no-op) if already busy."""
+        if self.busy:
+            return False
+        self.busy = True
+        return True
+
+    def finish(self) -> None:
+        """Clear busy state, e.g. from a `thread_worker`'s ``returned``/``errored`` signal."""
+        self.busy = False
+
+
+def _clip_window(current: int, half_width: int, n_frames: int) -> tuple[int, int]:
+    """The few-slices window: ``current`` ± ``half_width``, clipped to ``[0, n_frames)`` (FR-004).
+
+    Pure and display-independent, unit-tested directly (research R4).
+    """
+    start = max(0, current - half_width)
+    end = min(n_frames - 1, current + half_width)
+    return start, end
+
+
 class InteractiveSession:
     """Headless core of the interactive workflow over a single volume."""
 
@@ -38,6 +71,7 @@ class InteractiveSession:
         # prompt points as (frame_index, x, y, label) with label 1=positive, 0=negative
         self._points: list[tuple[int, float, float, int]] = []
         self._preview: MaskResult | None = None
+        self._last_preview_kwargs: dict = {}
 
     # -- prompt placement -------------------------------------------------
     def add_point(
@@ -65,8 +99,14 @@ class InteractiveSession:
         direction: str = "forward",
         combine_rule: str = "majority",
         postprocess: PostProcessConfig | None = None,
+        frame_range: tuple[int, int] | None = None,
     ) -> MaskResult:
-        """Run the shared engine on the current prompts and cache the resulting mask."""
+        """Run the shared engine on the current prompts and cache the resulting mask.
+
+        ``frame_range`` restricts computation to an inclusive range of frames on the prompted axis
+        (feature 007's single-slice/few-slices preview modes); ``None`` (default) sweeps the full
+        volume, unchanged from before.
+        """
         self._predictor.clear_prompts()
         by_frame: dict[int, tuple[list[list[float]], list[int]]] = {}
         for frame, x, y, label in self._points:
@@ -75,15 +115,32 @@ class InteractiveSession:
             labels.append(label)
         for frame, (coords, labels) in sorted(by_frame.items()):
             self._predictor.add_points(frame_index=frame, point_coords=coords, point_labels=labels)
+        # Remembered so export() can force a full recompute (frame_range=None) while preserving
+        # whatever axes/direction/combine_rule/postprocess the caller last configured (FR-008).
+        self._last_preview_kwargs = {
+            "axes": axes,
+            "direction": direction,
+            "combine_rule": combine_rule,
+            "postprocess": postprocess,
+        }
         self._preview = self._predictor.predict(
-            axes=axes, direction=direction, combine_rule=combine_rule, postprocess=postprocess
+            axes=axes,
+            direction=direction,
+            combine_rule=combine_rule,
+            postprocess=postprocess,
+            frame_range=frame_range,
         )
         return self._preview
 
     def export(self, output_path: str | Path, overwrite: bool = False) -> Path:
-        """Write the current preview to OME-Zarr v0.5 (computing one first if needed)."""
-        if self._preview is None:
-            self.preview()
+        """Write the full whole-volume mask to OME-Zarr v0.5, always recomputing it fresh.
+
+        Never reuses a cached ``self._preview`` (feature 007, FR-008/C-PV-9): a prior
+        single-slice/few-slices preview may only cover a partial ``frame_range``, and exporting
+        that partial result instead of the full volume would be silently wrong. Preserves whatever
+        axes/direction/combine_rule/postprocess the last ``preview()`` call used, if any.
+        """
+        self.preview(frame_range=None, **self._last_preview_kwargs)
         return self._preview.save(output_path, overwrite=overwrite)
 
     def read_volume(self) -> np.ndarray:
@@ -97,10 +154,17 @@ class InteractiveSession:
 
         Adds the volume as an image layer and a points layer for landmarks. New points default to
         positive (green); select one or more points and press ``n`` to flip them to negative/
-        exclusion (red), or ``y`` to flip them back to positive. Pressing ``p`` previews the mask
-        for the current points and ``e`` exports it. All masking goes through the shared engine
-        (FR-011).
+        exclusion (red), or ``y`` to flip them back to positive. Three preview shortcuts (feature
+        007): ``s`` (single-slice, current frame only), ``f`` (few-slices, a fixed ±5-frame window
+        around the current slice), and ``p`` (whole-volume, gated behind a confirmation since it's
+        the expensive one). ``s``/``f`` run asynchronously with a status-bar busy indicator and
+        ignore a repeat trigger while already computing (FR-010/FR-011). ``e`` exports the full
+        whole-volume mask, always freshly computed regardless of the last preview mode (FR-008).
+        All masking goes through the shared engine.
         """
+        from napari.qt.threading import thread_worker
+        from qtpy.QtWidgets import QMessageBox
+
         napari = _require_napari()
 
         volume = self.read_volume()
@@ -139,14 +203,77 @@ class InteractiveSession:
             for (z, y, x), pos in zip(points_layer.data, positive, strict=False):
                 self.add_point(int(round(z)), float(x), float(y), positive=bool(pos))
 
-        @viewer.bind_key("p")
-        def _preview(_viewer):  # noqa: ANN001
-            _sync_points_from_layer()
-            result = self.preview()
+        n_frames = volume.shape[0]
+        busy_guard = _PreviewBusyGuard()
+
+        def _merge_into_preview_layer(array: np.ndarray, frame_range: tuple[int, int]) -> None:
+            """Write ``array`` into the shared preview layer at only ``frame_range`` (research R3).
+
+            Every other frame keeps whatever it already held; the layer is created zero-filled at
+            the full volume shape first if it doesn't exist yet.
+            """
+            data = array.astype(np.uint8)
+            start, end = frame_range
             if "preview" in viewer.layers:
-                viewer.layers["preview"].data = result.array.astype(np.uint8)
+                layer = viewer.layers["preview"]
+                merged = layer.data.copy()
+                merged[start : end + 1] = data[start : end + 1]
+                layer.data = merged
             else:
-                viewer.add_labels(result.array.astype(np.uint8), name="preview")
+                viewer.add_labels(data, name="preview")
+
+        def _run_async_preview(frame_range: tuple[int, int], busy_message: str) -> None:
+            if not busy_guard.try_start():  # FR-011: ignore a trigger while one is in flight
+                return
+            _sync_points_from_layer()
+            start, end = frame_range
+            if not any(start <= p[0] <= end for p in self._points):
+                busy_guard.finish()
+                viewer.status = "preview: no prompts on the requested frame(s)"
+                return
+
+            @thread_worker
+            def _compute():
+                return self.preview(axes=["z"], frame_range=frame_range)
+
+            def _on_done(result) -> None:  # noqa: ANN001
+                busy_guard.finish()
+                viewer.status = ""
+                _merge_into_preview_layer(result.array, frame_range)
+
+            def _on_error(exc: Exception) -> None:
+                busy_guard.finish()
+                viewer.status = f"preview failed: {exc}"
+
+            viewer.status = busy_message
+            worker = _compute()
+            worker.returned.connect(_on_done)
+            worker.errored.connect(_on_error)
+
+        @viewer.bind_key("s")
+        def _preview_single_slice(_viewer):  # noqa: ANN001
+            current = int(viewer.dims.current_step[0])
+            _run_async_preview((current, current), "computing single-slice preview...")
+
+        @viewer.bind_key("f")
+        def _preview_few_slices(_viewer):  # noqa: ANN001
+            current = int(viewer.dims.current_step[0])
+            window = _clip_window(current, half_width=5, n_frames=n_frames)
+            _run_async_preview(window, "computing few-slices preview...")
+
+        @viewer.bind_key("p")
+        def _preview_whole_volume(_viewer):  # noqa: ANN001
+            answer = QMessageBox.question(
+                None,
+                "Whole-volume preview",
+                "This recomputes the mask across the entire volume and can take several minutes "
+                "on real data. Continue?",
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            _sync_points_from_layer()
+            result = self.preview(axes=["z"])
+            _merge_into_preview_layer(result.array, (0, n_frames - 1))
 
         @viewer.bind_key("e")
         def _export(_viewer):  # noqa: ANN001
