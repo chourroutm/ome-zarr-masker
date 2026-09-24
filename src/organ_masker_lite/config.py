@@ -55,6 +55,7 @@ class PostProcessConfig:
     fill_holes: bool = True
     dilation_radius: int = 0
     erosion_radius: int = 0
+    invert: bool = False
 
     def __post_init__(self) -> None:
         if self.dilation_radius < 0 or self.erosion_radius < 0:
@@ -62,7 +63,12 @@ class PostProcessConfig:
 
     @property
     def is_noop(self) -> bool:
-        return not self.fill_holes and self.dilation_radius == 0 and self.erosion_radius == 0
+        return (
+            not self.fill_holes
+            and self.dilation_radius == 0
+            and self.erosion_radius == 0
+            and not self.invert
+        )
 
 
 @dataclass
@@ -138,6 +144,7 @@ class RunConfig:
                 "fill_holes": self.postprocess.fill_holes,
                 "dilation_radius": self.postprocess.dilation_radius,
                 "erosion_radius": self.postprocess.erosion_radius,
+                "invert": self.postprocess.invert,
             },
             "model_dir": str(self.resolved_model_dir()),
             "allow_download": self.allow_download,
