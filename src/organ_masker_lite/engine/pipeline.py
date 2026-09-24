@@ -15,7 +15,7 @@ from ..io.reader import OmeZarrReader, ReaderError
 from ..io.validate import validate_ome_zarr
 from ..io.writer import write_mask
 from ..postprocess.morphology import postprocess_mask
-from ..prompts.model import PromptSet
+from ..prompts.model import Prompt, PromptSet
 from ..sam2 import Sam2Backend
 from .combine import VoteAccumulator
 from .sweep import run_sweep, seeds_from_mask
@@ -36,6 +36,53 @@ def _axis_dir(workdir: str | Path, axis_name: str) -> Path:
     path = Path(workdir) / f"axis_{axis_name}"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _crop_to_frame_range(
+    volume: np.ndarray,
+    prompts: PromptSet,
+    frame_range: tuple[int, int],
+    axis_index: int,
+) -> tuple[np.ndarray, PromptSet, int]:
+    """Crop ``volume`` along ``axis_index`` to the inclusive ``frame_range`` and remap ``prompts``.
+
+    Prompts whose ``frame_index`` falls outside ``frame_range`` are dropped (feature 007, FR-004);
+    the rest are remapped to local (cropped) frame indices. Returns ``(cropped_volume,
+    remapped_prompts, offset)`` where ``offset == frame_range[0]``, for use by
+    :func:`_place_at_offset`.
+    """
+    start, end = frame_range
+    slicer: list[slice] = [slice(None)] * volume.ndim
+    slicer[axis_index] = slice(start, end + 1)
+    cropped = volume[tuple(slicer)]
+
+    remapped = [
+        Prompt(
+            frame_index=p.frame_index - start,
+            point_coords=p.point_coords.copy(),
+            point_labels=p.point_labels.copy(),
+            box=None if p.box is None else p.box.copy(),
+            obj_id=p.obj_id,
+        )
+        for p in prompts.prompts
+        if start <= p.frame_index <= end
+    ]
+    return cropped, PromptSet(remapped), start
+
+
+def _place_at_offset(
+    cropped: np.ndarray, offset: int, axis_index: int, full_shape: tuple[int, ...]
+) -> np.ndarray:
+    """Place a cropped boolean mask into a zero-filled array of ``full_shape`` at ``offset``.
+
+    Every frame outside ``[offset, offset + cropped.shape[axis_index])`` along ``axis_index``
+    stays background (``False``) -- nothing was computed there (feature 007, research R3).
+    """
+    full = np.zeros(full_shape, dtype=bool)
+    slicer: list[slice] = [slice(None)] * len(full_shape)
+    slicer[axis_index] = slice(offset, offset + cropped.shape[axis_index])
+    full[tuple(slicer)] = cropped
+    return full
 
 
 def preflight_disk(required_bytes: int, path: str | Path) -> None:
@@ -103,6 +150,21 @@ def compute_mask(
     report(f"reading level {level} {level_shape}")
     volume = reader.read_level(level)
 
+    frame_offset = 0
+    working_shape = level_shape
+    if config.frame_range is not None:
+        start, end = config.frame_range
+        n_frames = level_shape[prompted_index]
+        if not (0 <= start <= end < n_frames):
+            raise PipelineError(
+                f"frame_range {config.frame_range} out of bounds for {n_frames} frames "
+                f"on axis '{prompted_axis}'"
+            )
+        volume, prompts, frame_offset = _crop_to_frame_range(
+            volume, prompts, config.frame_range, prompted_index
+        )
+        working_shape = volume.shape
+
     if backend is None:
         try:
             backend = Sam2Backend(config=config)
@@ -110,8 +172,8 @@ def compute_mask(
             raise PipelineError(str(exc)) from exc
 
     with tempfile.TemporaryDirectory(prefix="organ_masker_") as workdir:
-        preflight_disk(estimate_intermediate_bytes(level_shape), workdir)
-        accumulator = VoteAccumulator(level_shape, workdir)
+        preflight_disk(estimate_intermediate_bytes(working_shape), workdir)
+        accumulator = VoteAccumulator(working_shape, workdir)
 
         # Sweep the prompted axis first; its 3D mask seeds the other selected axes (FR-022).
         report(f"sweeping prompted axis '{prompted_axis}' ({config.direction})")
@@ -152,6 +214,9 @@ def compute_mask(
     if not config.postprocess.is_noop:
         report("post-processing mask")
         consensus = postprocess_mask(consensus, config.postprocess)
+
+    if config.frame_range is not None:
+        consensus = _place_at_offset(consensus, frame_offset, prompted_index, level_shape)
 
     record = {
         "run_id": run_id,
