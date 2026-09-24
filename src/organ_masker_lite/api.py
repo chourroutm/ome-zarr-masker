@@ -86,11 +86,17 @@ class OrganMaskPredictor:
         point_coords,
         point_labels,
         obj_id: int = 0,
+        *,
+        box=None,
     ) -> OrganMaskPredictor:
-        """Add point prompts; argument names/shapes match SAM2's ``add_new_points_or_box``.
+        """Add point (and optionally box) prompts for one frame in a single call.
 
-        ``point_coords`` is ``(N, 2)`` of ``(x, y)``; ``point_labels`` is ``(N,)`` with ``1``
-        positive and ``0`` negative/exclusion (research R4).
+        Argument names/shapes match SAM2's ``add_new_points_or_box``. ``point_coords`` is
+        ``(N, 2)`` of ``(x, y)``; ``point_labels`` is ``(N,)`` with ``1`` positive and ``0``
+        negative/exclusion (research R4). ``box`` is an optional ``[x_min, y_min, x_max, y_max]``
+        (feature 006, research R2): passing points and a box together in one call is required --
+        two separate ``add_points``/``add_box`` calls for the same frame would have SAM2 silently
+        drop one or the other (its ``clear_old_points=True`` default replaces, not accumulates).
         """
         self._require_volume()
         self._prompts.append(
@@ -98,6 +104,7 @@ class OrganMaskPredictor:
                 frame_index=frame_index,
                 point_coords=point_coords,
                 point_labels=point_labels,
+                box=box,
                 obj_id=obj_id,
             )
         )

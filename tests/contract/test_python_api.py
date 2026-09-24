@@ -99,8 +99,10 @@ def test_c_api_6_saved_output_valid_same_levels(single_blob_zarr, tmp_path):
 def test_c_api_7_argument_names_and_shapes_match_sam2():
     points_params = list(inspect.signature(OrganMaskPredictor.add_points).parameters)
     box_params = list(inspect.signature(OrganMaskPredictor.add_box).parameters)
-    # SAM2-style prompt arguments
-    assert points_params == ["self", "frame_index", "point_coords", "point_labels", "obj_id"]
+    # SAM2-style prompt arguments. `box` (feature 006, keyword-only) lets a caller combine a
+    # frame's points and box into one call -- required so SAM2 doesn't silently drop one or the
+    # other (research R2); `add_box` is unchanged, still a valid box-only call.
+    assert points_params == ["self", "frame_index", "point_coords", "point_labels", "obj_id", "box"]
     assert box_params == ["self", "frame_index", "box", "obj_id"]
 
 
