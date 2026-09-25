@@ -66,9 +66,9 @@ the appearance/rectangle-only constraints from spec.md FR-005/006/007/008.
 Primarily one file, `src/organ_masker_lite/interactive.py`: the headless core gains box
 bookkeeping and merges each frame's points+box into a single `Prompt` before reaching the
 predictor; `launch()` grows from one points layer to three layers plus the new keybinding/event
-logic. Plus one small, backward-compatible addition to `api.py`: `OrganMaskPredictor.add_points`
+logic. Plus one small, backward-compatible addition to `api.py`: `OrganMaskPredictor.add_points_or_box`
 gains an optional `box` parameter (research R2 — confirmed via the installed SAM2 source that two
-separate `add_points`/`add_box` calls for the same frame silently drop one or the other, since
+separate `add_points_or_box`/`add_box` calls for the same frame silently drop one or the other, since
 SAM2's `clear_old_points=True` default replaces rather than accumulates per-frame prompts). No
 changes to `sam2.py`, `prompts/model.py`, or `cli.py`.
 
@@ -98,7 +98,7 @@ Constitution v1.1.0 (four core principles):
 No unjustified violations. No Complexity Tracking entries needed.
 
 **Post-Phase-1 re-check**: Phase 1 design (research R2) revealed that `api.py` needs one small,
-backward-compatible change (an optional `box` parameter on `add_points`) beyond the
+backward-compatible change (an optional `box` parameter on `add_points_or_box`) beyond the
 `interactive.py`-only scope assumed going into Phase 0. This does not change the Constitution Check
 outcome on any principle — it's strictly smaller than a new method, has no new callers to migrate,
 and was discovered specifically *by* the Principle-I-driven research (verifying against the actual
@@ -125,13 +125,13 @@ specs/006-interactive-prompt-layers/
 
 ```text
 src/organ_masker_lite/
-├── api.py                     # changed: OrganMaskPredictor.add_points gains an optional `box`
+├── api.py                     # changed: OrganMaskPredictor.add_points_or_box gains an optional `box`
 │                               #          parameter (research R2) so a frame's points+box reach
 │                               #          SAM2 in one call; add_box unchanged, still works alone
 └── interactive.py             # changed (the feature's primary file):
                                 #   - headless core: _boxes bookkeeping, add_box/clear_points
                                 #     updates, preview() merges points+box per frame into one
-                                #     add_points(..., box=...) call (research R2)
+                                #     add_points_or_box(..., box=...) call (research R2)
                                 #   - launch(): positive/negative Points layers + positive-box
                                 #     Shapes layer, appearance styling (FR-005/006/008),
                                 #     rectangle-only enforcement (FR-007), viewer-level n/y

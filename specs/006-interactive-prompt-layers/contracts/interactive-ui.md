@@ -36,7 +36,7 @@ implicitly by the current `launch()` implementation; all other `interactive` sub
 - **C-UI-13**: `p` (preview) and `e` (export) MUST resync the headless core from all three layers
   before computing/exporting: points from `positive-points`/`negative-points`, and at most one
   rectangle per frame from `positive-box` (replacing on redraw per FR-010), merged per frame into
-  one `Prompt`/one `OrganMaskPredictor.add_points(..., box=...)` call (research R2 — required to
+  one `Prompt`/one `OrganMaskPredictor.add_points_or_box(..., box=...)` call (research R2 — required to
   avoid SAM2 silently dropping one of two separate per-frame calls).
 
 ## Headless core (`InteractiveSession`, napari-independent)

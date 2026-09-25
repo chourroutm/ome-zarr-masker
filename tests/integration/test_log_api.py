@@ -24,7 +24,7 @@ def test_api_predict_logs_prompts_and_exposes_runid(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
     logdir = tmp_path / "logs"
     predictor = OrganMaskPredictor(log_dir=logdir).set_volume(store, level=0)
-    predictor.add_points(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
+    predictor.add_points_or_box(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
     result = predictor.predict(axes=["z"])
 
     log = next(logdir.glob("*.log"))
@@ -45,7 +45,8 @@ def test_failed_api_predict_still_writes_log(single_blob_zarr, tmp_path):
     store, (cx, cy), _frame = single_blob_zarr
     logdir = tmp_path / "logs"
     predictor = OrganMaskPredictor(log_dir=logdir).set_volume(store, level=0)
-    predictor.add_points(frame_index=9999, point_coords=[[cx, cy]], point_labels=[1])  # bad frame
+    # bad frame
+    predictor.add_points_or_box(frame_index=9999, point_coords=[[cx, cy]], point_labels=[1])
     with pytest.raises(PromptError):
         predictor.predict(axes=["z"])
     log = next(logdir.glob("*.log"))

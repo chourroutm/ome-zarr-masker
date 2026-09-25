@@ -6,7 +6,7 @@ Mirrors the structure of the SAM/SAM2 predictor so SAM users adopt it with minim
 
     predictor = OrganMaskPredictor()
     predictor.set_volume("input.ome.zarr", level=3)          # mirrors SAM set_image
-    predictor.add_points(frame_index=120, point_coords=[[x, y]], point_labels=[1])
+    predictor.add_points_or_box(frame_index=120, point_coords=[[x, y]], point_labels=[1])
     mask = predictor.predict(axes=["z"], direction="forward")
     mask.save("output.ome.zarr")
 """
@@ -80,7 +80,7 @@ class OrganMaskPredictor:
         self._prompts = []
         return self
 
-    def add_points(
+    def add_points_or_box(
         self,
         frame_index: int,
         point_coords,
@@ -95,8 +95,9 @@ class OrganMaskPredictor:
         ``(N, 2)`` of ``(x, y)``; ``point_labels`` is ``(N,)`` with ``1`` positive and ``0``
         negative/exclusion (research R4). ``box`` is an optional ``[x_min, y_min, x_max, y_max]``
         (feature 006, research R2): passing points and a box together in one call is required --
-        two separate ``add_points``/``add_box`` calls for the same frame would have SAM2 silently
-        drop one or the other (its ``clear_old_points=True`` default replaces, not accumulates).
+        two separate ``add_points_or_box``/``add_box`` calls for the same frame would have SAM2
+        silently drop one or the other (its ``clear_old_points=True`` default replaces, not
+        accumulates).
         """
         self._require_volume()
         self._prompts.append(

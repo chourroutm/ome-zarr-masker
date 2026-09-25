@@ -37,15 +37,15 @@ Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/
 ## Phase 1: Foundational (blocking prerequisite for both stories)
 
 - [X] T001 Add `box: np.ndarray | None = None` (keyword-only) to
-      `OrganMaskPredictor.add_points` in `src/organ_masker_lite/api.py`, threaded into the single
+      `OrganMaskPredictor.add_points_or_box` in `src/organ_masker_lite/api.py`, threaded into the single
       `Prompt` it constructs; `add_box` unchanged (research R2)
 - [X] T002 Update `test_c_api_7_argument_names_and_shapes_match_sam2` in
-      `tests/contract/test_python_api.py` for `add_points`'s new `box` parameter (caught as a
+      `tests/contract/test_python_api.py` for `add_points_or_box`'s new `box` parameter (caught as a
       regression when the fast suite was re-run after T001)
 - [X] T003 Add `_boxes: dict[int, np.ndarray]` state plus `add_box`/`clear_boxes` methods to
       `InteractiveSession` in `src/organ_masker_lite/interactive.py` (data-model.md)
 - [X] T004 Rewrite `InteractiveSession.preview()`'s prompt-building loop to iterate the union of
-      frames-with-points and frames-with-a-box, calling `add_points(..., box=...)` once per frame
+      frames-with-points and frames-with-a-box, calling `add_points_or_box(..., box=...)` once per frame
       (research R2) in `src/organ_masker_lite/interactive.py`
 
 **Tests** (fast, GPU-free):
@@ -64,7 +64,7 @@ Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/
       `test_interactive_point_and_box_match_equivalent_cli_prompt`
 
 **Checkpoint**: Headless core supports box prompts, merged correctly with points per frame; the
-engine change is byte-compatible for every existing `add_points` caller (default `box=None`).
+engine change is byte-compatible for every existing `add_points_or_box` caller (default `box=None`).
 
 ---
 
