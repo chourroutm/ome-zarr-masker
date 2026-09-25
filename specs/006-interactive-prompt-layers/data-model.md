@@ -27,17 +27,17 @@ New/changed methods:
   point-layer resync and box-layer resync remain independent operations.
 - **`preview(...)`** (changed): still groups `_points` by frame, but now also looks up
   `_boxes.get(frame)` for each frame that has either points or a box, and calls
-  `self._predictor.add_points_or_box(frame_index=frame, point_coords=coords, point_labels=labels,
+  `self._predictor.add_prompts(frame_index=frame, point_coords=coords, point_labels=labels,
   box=_boxes.get(frame))` — one call per frame carrying everything for that frame, per research R2.
-  A frame with only a box and no points calls `add_points_or_box` with empty `coords`/`labels` arrays and
+  A frame with only a box and no points calls `add_prompts` with empty `coords`/`labels` arrays and
   the box, which is already valid input (mirrors `add_box`'s existing empty-points construction).
 
 ## `OrganMaskPredictor` (`src/organ_masker_lite/api.py`)
 
-- **`add_points_or_box(frame_index, point_coords, point_labels, obj_id=0, *, box=None)`** (changed): new
+- **`add_prompts(frame_index, point_coords, point_labels, obj_id=0, *, box=None)`** (changed): new
   optional keyword-only `box` parameter, threaded into the single `Prompt` this method already
   constructs. Existing callers (CLI path via `sam2.py`'s wrapper is unaffected; nothing calls
-  `add_points_or_box` without `box` today, so the default `None` preserves all current behavior
+  `add_prompts` without `box` today, so the default `None` preserves all current behavior
   byte-for-byte).
 - **`add_box(frame_index, box, obj_id=0)`**: unchanged; remains a valid standalone box-only call.
 

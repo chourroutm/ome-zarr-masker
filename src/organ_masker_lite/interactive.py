@@ -126,12 +126,12 @@ class InteractiveSession:
             coords, labels = by_frame.setdefault(frame, ([], []))
             coords.append([x, y])
             labels.append(label)
-        # Merge each frame's points and box into ONE add_points_or_box(..., box=...) call
+        # Merge each frame's points and box into ONE add_prompts(..., box=...) call
         # (feature 006, research R2): SAM2 silently drops one or the other if they're two
         # separate calls.
         for frame in sorted(set(by_frame) | set(self._boxes)):
             coords, labels = by_frame.get(frame, ([], []))
-            self._predictor.add_points_or_box(
+            self._predictor.add_prompts(
                 frame_index=frame,
                 point_coords=coords,
                 point_labels=labels,

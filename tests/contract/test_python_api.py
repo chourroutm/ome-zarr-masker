@@ -33,7 +33,7 @@ def _predictor(store, level=0):
 def test_c_api_1_single_point_includes_point(single_blob_zarr):
     store, (cx, cy), frame = single_blob_zarr
     p = _predictor(store)
-    p.add_points_or_box(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
+    p.add_prompts(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
     result = p.predict(axes=["z"])
     assert result.array.any()
     assert result.array[frame, int(cy), int(cx)] == 1
@@ -59,7 +59,7 @@ def test_c_api_2_box_foreground_within_box(single_blob_zarr):
 def test_c_api_3_negative_point_excludes_region(two_blob_zarr):
     store, (ax, ay), (bx, by), frame = two_blob_zarr
     p = _predictor(store)
-    p.add_points_or_box(
+    p.add_prompts(
         frame_index=frame,
         point_coords=[[ax, ay], [bx, by], [bx, by]],
         point_labels=[1, 1, 0],
@@ -79,7 +79,7 @@ def test_c_api_4_no_positive_prompt_raises(single_blob_zarr):
 def test_c_api_5_out_of_bounds_raises(single_blob_zarr):
     store, _center, frame = single_blob_zarr
     p = _predictor(store)
-    p.add_points_or_box(frame_index=frame, point_coords=[[999, 999]], point_labels=[1])
+    p.add_prompts(frame_index=frame, point_coords=[[999, 999]], point_labels=[1])
     with pytest.raises(PromptError):
         p.predict(axes=["z"])
 
@@ -89,7 +89,7 @@ def test_c_api_5_out_of_bounds_raises(single_blob_zarr):
 def test_c_api_6_saved_output_valid_same_levels(single_blob_zarr, tmp_path):
     store, (cx, cy), frame = single_blob_zarr
     p = _predictor(store)
-    p.add_points_or_box(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
+    p.add_prompts(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
     out = p.predict(axes=["z"]).save(tmp_path / "api_out.ome.zarr")
 
     validate_ome_zarr(out)  # valid OME-Zarr v0.5
@@ -97,7 +97,7 @@ def test_c_api_6_saved_output_valid_same_levels(single_blob_zarr, tmp_path):
 
 
 def test_c_api_7_argument_names_and_shapes_match_sam2():
-    points_params = list(inspect.signature(OrganMaskPredictor.add_points_or_box).parameters)
+    points_params = list(inspect.signature(OrganMaskPredictor.add_prompts).parameters)
     box_params = list(inspect.signature(OrganMaskPredictor.add_box).parameters)
     # SAM2-style prompt arguments. `box` (feature 006, keyword-only) lets a caller combine a
     # frame's points and box into one call -- required so SAM2 doesn't silently drop one or the

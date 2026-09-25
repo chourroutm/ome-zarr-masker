@@ -43,7 +43,7 @@ def test_api_and_cli_produce_equivalent_masks(single_blob_zarr, tmp_path):
 
     # API path with the same input/prompts/level
     predictor = OrganMaskPredictor().set_volume(store, level=0)
-    predictor.add_points_or_box(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
+    predictor.add_prompts(frame_index=frame, point_coords=[[cx, cy]], point_labels=[1])
     api_out = predictor.predict(axes=["z"]).save(tmp_path / "api.ome.zarr")
 
     cli_reader = OmeZarrReader(cli_out)

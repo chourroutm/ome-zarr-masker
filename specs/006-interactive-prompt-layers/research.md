@@ -74,7 +74,7 @@ layer UI proves confusing in practice).
 
 ## R2: Combining a frame's points and box into the masking engine
 
-**Question**: `OrganMaskPredictor.add_points_or_box` and `.add_box` (`api.py:83-123`) each independently
+**Question**: `OrganMaskPredictor.add_prompts` and `.add_box` (`api.py:83-123`) each independently
 append a *separate* `Prompt` object for a given frame. If a frame has both point prompts and a box
 prompt, calling both methods for that frame produces two separate `Prompt` entries, which
 `sam2.py`'s backend then sends to SAM2's `add_new_points_or_box` as two separate calls for the same
@@ -95,7 +95,7 @@ This is a real, confirmed data-loss bug if implemented naively, not a hypothetic
 
 The interactive session's `preview()` MUST therefore merge each frame's points and box into a
 single `Prompt` — one predictor call per frame — before reaching SAM2. Mechanism: extend
-`OrganMaskPredictor.add_points_or_box` (`api.py:83-104`) with a new optional `box: np.ndarray | None =
+`OrganMaskPredictor.add_prompts` (`api.py:83-104`) with a new optional `box: np.ndarray | None =
 None` parameter threaded straight into the `Prompt(...)` it already constructs, so one call can
 carry a frame's points and box together. `add_box` (`api.py:111-123`) stays as a thin,
 backward-compatible convenience wrapper for the box-only case (unaffected, still calls the same
@@ -103,7 +103,7 @@ underlying `Prompt` construction). This is the one small `api.py` change this fe
 plan's "no `api.py` changes" assumption from before this research was inaccurate and is corrected
 here.
 
-**Rationale**: Extending `add_points_or_box` with an optional `box` parameter is the minimal change that
+**Rationale**: Extending `add_prompts` with an optional `box` parameter is the minimal change that
 avoids the confirmed accumulation bug — no new method, no reaching into `OrganMaskPredictor`'s
 private `_prompts` list from `interactive.py`, and `add_box`'s existing callers/tests are
 unaffected since its own behavior doesn't change. It also matches the CLI/batch prompt-file path,
@@ -112,10 +112,10 @@ together (`prompts/model.py:22-49`, `load_prompt_file` already merges per frame)
 a new shape, just reusing the one `Prompt` already models, consistent with FR-009's "same
 underlying prompt model" requirement and directly serving SC-004 (interactive/CLI parity).
 
-**Alternatives considered**: call `add_points_or_box` then `add_box` separately for a frame with both and
+**Alternatives considered**: call `add_prompts` then `add_box` separately for a frame with both and
 trust SAM2 to accumulate — ruled out by reading the source (confirmed unsafe, not just unverified);
 have `interactive.py` construct `Prompt` objects itself and reach into
 `OrganMaskPredictor._prompts` directly — rejected, breaks encapsulation across a private attribute
-for no benefit over a one-parameter, backward-compatible `add_points_or_box` extension; add a wholly new
-`add_prompt(...)` method instead of extending `add_points_or_box` — rejected as an unnecessary second
-entry point for what `add_points_or_box` already does, just missing one optional parameter.
+for no benefit over a one-parameter, backward-compatible `add_prompts` extension; add a wholly new
+`add_prompt(...)` method instead of extending `add_prompts` — rejected as an unnecessary second
+entry point for what `add_prompts` already does, just missing one optional parameter.
