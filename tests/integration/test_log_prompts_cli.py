@@ -7,6 +7,7 @@ import json
 import pytest
 
 from organ_masker_lite.cli import main
+from organ_masker_lite.io.reader import OmeZarrReader
 
 from ..conftest import sam2_available
 
@@ -80,3 +81,42 @@ def test_cli_box_prompt_recorded(single_blob_zarr, tmp_path):
     assert code == 0
     text = next(logdir.glob("*.log")).read_text()
     assert "box xyxy=[4.0, 4.0, 12.0, 12.0]" in text
+
+
+@pytest.mark.real_backend
+@pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
+def test_cli_run_record_and_log_show_authoring_level(single_blob_zarr, tmp_path):
+    """US2 Acceptance Scenario 1 / C-PF-7: the saved run_record.json and input log surface the
+    prompt file's own authoring level, not the (possibly different) --level the run used.
+    """
+    store, _center, _frame = single_blob_zarr
+    coarsest = OmeZarrReader(store).n_levels - 1
+    prompts = tmp_path / "p.json"
+    prompts.write_text(
+        json.dumps(
+            {
+                "level": coarsest,
+                "objects": [{"obj_id": 0, "points": [{"frame": 2, "xy": [4, 4], "label": 1}]}],
+            }
+        )
+    )
+    logdir = tmp_path / "logs"
+    out = tmp_path / "out.ome.zarr"
+    code = main(
+        [
+            "mask",
+            str(store),
+            str(out),
+            "--prompts",
+            str(prompts),
+            "--level",
+            str(coarsest),
+            "--log-dir",
+            str(logdir),
+        ]
+    )
+    assert code == 0
+    text = next(logdir.glob("*.log")).read_text()
+    assert f"prompt_level: {coarsest}" in text
+    record = json.loads((out / "run_record.json").read_text())
+    assert record["prompts"]["level"] == coarsest
