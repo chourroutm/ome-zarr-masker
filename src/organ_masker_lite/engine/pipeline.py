@@ -15,7 +15,7 @@ from ..io.reader import OmeZarrReader, ReaderError
 from ..io.validate import validate_ome_zarr
 from ..io.writer import write_mask
 from ..postprocess.morphology import postprocess_mask
-from ..prompts.model import Prompt, PromptSet
+from ..prompts.model import Prompt, PromptError, PromptSet
 from ..sam2 import Sam2Backend
 from .combine import VoteAccumulator
 from .sweep import run_sweep, seeds_from_mask
@@ -143,6 +143,18 @@ def compute_mask(
     prompted_axis = config.axes[0]
     prompted_index = reader.axes.index(prompted_axis)
     level_shape = reader.level_shape(level)
+
+    # Convert prompts authored at a different level to this run's level (feature
+    # 008-level-agnostic-prompts, FR-004/FR-008) before validating against it.
+    if prompts.level is not None and prompts.level != level:
+        if not (0 <= prompts.level < reader.n_levels):
+            raise PromptError(
+                f"prompt set was authored at level {prompts.level}, which does not exist for "
+                f"this input; available levels: {reader.describe_levels()}"
+            )
+        prompts = prompts.resolved_for_shape(
+            reader.level_shape(prompts.level), level_shape, prompted_index
+        )
 
     # The user places landmarks on the prompted axis's planes; validate against that axis (FR-022).
     prompts.validate(level_shape, prompted_index)
