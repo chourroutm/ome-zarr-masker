@@ -157,7 +157,10 @@ class OrganMaskPredictor:
             kwargs["axes"] = list(axes)
         config = RunConfig(**kwargs)
 
-        prompt_set = PromptSet(list(self._prompts))
+        # Stamp the level these prompts were added at (feature 008-level-agnostic-prompts, FR-002):
+        # set_volume resets self._prompts on every call, so self._level is the one level every
+        # currently-held prompt was actually added under.
+        prompt_set = PromptSet(list(self._prompts), level=self._level)
         with log_invocation("api", self._log_config) as log:
             log.record_config(config.to_record())
             log.record_prompts(prompt_set, source="api")

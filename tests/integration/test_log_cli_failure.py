@@ -10,7 +10,12 @@ from organ_masker_lite.cli import main
 def _write_prompts(path, frame, cx, cy):
     path.write_text(
         json.dumps(
-            {"objects": [{"obj_id": 0, "points": [{"frame": frame, "xy": [cx, cy], "label": 1}]}]}
+            {
+                "level": 0,
+                "objects": [
+                    {"obj_id": 0, "points": [{"frame": frame, "xy": [cx, cy], "label": 1}]}
+                ],
+            }
         )
     )
 

@@ -128,13 +128,14 @@ def test_interactive_point_and_box_match_equivalent_cli_prompt(single_blob_zarr,
     prompts_path.write_text(
         json.dumps(
             {
+                "level": 0,
                 "objects": [
                     {
                         "obj_id": 0,
                         "points": [{"frame": frame, "xy": [cx, cy], "label": 1}],
                         "box": {"frame": frame, "xyxy": box},
                     }
-                ]
+                ],
             }
         )
     )

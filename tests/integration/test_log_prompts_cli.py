@@ -20,7 +20,12 @@ def test_cli_point_prompts_recorded(single_blob_zarr, tmp_path):
     prompts = tmp_path / "p.json"
     prompts.write_text(
         json.dumps(
-            {"objects": [{"obj_id": 0, "points": [{"frame": frame, "xy": [cx, cy], "label": 1}]}]}
+            {
+                "level": 0,
+                "objects": [
+                    {"obj_id": 0, "points": [{"frame": frame, "xy": [cx, cy], "label": 1}]}
+                ],
+            }
         )
     )
     logdir = tmp_path / "logs"
@@ -51,7 +56,12 @@ def test_cli_box_prompt_recorded(single_blob_zarr, tmp_path):
     store, _center, frame = single_blob_zarr
     prompts = tmp_path / "p.json"
     prompts.write_text(
-        json.dumps({"objects": [{"obj_id": 0, "box": {"frame": frame, "xyxy": [4, 4, 12, 12]}}]})
+        json.dumps(
+            {
+                "level": 0,
+                "objects": [{"obj_id": 0, "box": {"frame": frame, "xyxy": [4, 4, 12, 12]}}],
+            }
+        )
     )
     logdir = tmp_path / "logs"
     code = main(

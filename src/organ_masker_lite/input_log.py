@@ -74,9 +74,13 @@ class InvocationLog:
         _emit_mapping(self._emit, effective_config, indent="  ")
 
     def record_prompts(self, prompts: PromptSet, source: str) -> None:
-        """Append the full prompt set with its source and count (FR-003, FR-010)."""
-        records = prompts.to_record()
+        """Append the full prompt set with its source, authoring level, and count (FR-003, FR-010;
+        the authoring level is feature 008-level-agnostic-prompts, FR-002).
+        """
+        record = prompts.to_record()
+        records = record["objects"]
         self._emit(f"prompt_source: {source}")
+        self._emit(f"prompt_level: {record['level']}")
         self._emit(f"prompt_count: {len(records)}")
         self._emit("prompts:")
         for i, rec in enumerate(records):

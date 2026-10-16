@@ -50,12 +50,69 @@ class Prompt:
 
 @dataclass
 class PromptSet:
-    """A collection of prompts for one run (single target structure, FR-021)."""
+    """A collection of prompts for one run (single target structure, FR-021).
+
+    ``level`` is the pyramid level these prompts' coordinates were authored against (feature
+    008-level-agnostic-prompts, FR-002); ``None`` means "already in whatever level this set is
+    used at" -- the default for prompt sets not produced by one of the two authoring paths
+    (a loaded prompt file, or the ``OrganMaskPredictor`` API), e.g. internal/test construction and
+    pipeline-internal seed prompts for secondary sweep axes.
+    """
 
     prompts: list[Prompt] = field(default_factory=list)
+    level: int | None = None
 
     def has_positive(self) -> bool:
         return any(p.point_labels.tolist().count(1) or p.box is not None for p in self.prompts)
+
+    def resolved_for_shape(
+        self, src_shape: tuple[int, ...], dst_shape: tuple[int, ...], axis_index: int
+    ) -> PromptSet:
+        """Convert every prompt's coordinates from ``src_shape``'s pixel grid to ``dst_shape``'s.
+
+        Uses the same nested-grid relationship between pyramid levels that mask resampling
+        (``io/writer.py``) already relies on: the ratio of shapes along each axis (FR-004). Returns
+        ``self`` unchanged when the shapes are equal (FR-006) -- a true identity, not a recomputed
+        ratio-of-1.0. ``axis_index`` is the sweep axis; the other two axes are "height" and "width"
+        in the same order :meth:`validate` uses, so the two stay consistent by construction.
+        """
+        if tuple(src_shape) == tuple(dst_shape):
+            return self
+        remaining = [i for i in range(len(src_shape)) if i != axis_index]
+        height_axis, width_axis = remaining[0], remaining[1]
+        frame_ratio = dst_shape[axis_index] / src_shape[axis_index]
+        height_ratio = dst_shape[height_axis] / src_shape[height_axis]
+        width_ratio = dst_shape[width_axis] / src_shape[width_axis]
+
+        def convert(p: Prompt) -> Prompt:
+            coords = p.point_coords.copy()
+            if coords.size:
+                coords[:, 0] = np.round(coords[:, 0] * width_ratio)
+                coords[:, 1] = np.round(coords[:, 1] * height_ratio)
+            box = None
+            if p.box is not None:
+                x0, y0, x1, y1 = p.box
+                box = np.array(
+                    [
+                        round(x0 * width_ratio),
+                        round(y0 * height_ratio),
+                        round(x1 * width_ratio),
+                        round(y1 * height_ratio),
+                    ],
+                    dtype=float,
+                )
+            # Bypass Prompt's validating __init__/__post_init__: these values are already valid
+            # (same shapes, same labels, box already a (4,) float array) by construction, and
+            # re-validating them dominates cost for large prompt sets (plan.md's perf budget).
+            new = Prompt.__new__(Prompt)
+            new.frame_index = round(p.frame_index * frame_ratio)
+            new.point_coords = coords
+            new.point_labels = p.point_labels
+            new.box = box
+            new.obj_id = p.obj_id
+            return new
+
+        return PromptSet(prompts=[convert(p) for p in self.prompts], level=self.level)
 
     def validate(self, level_shape: tuple[int, ...], axis_index: int) -> None:
         """Validate prompts against the selected level (FR-015).
@@ -83,10 +140,14 @@ class PromptSet:
                 if not (0 <= x0 < x1 <= width and 0 <= y0 < y1 <= height):
                     raise PromptError(f"box {p.box.tolist()} out of bounds or malformed")
 
-    def to_record(self) -> list[dict]:
-        out = []
+    def to_record(self) -> dict:
+        """Serialize to the same ``{"level", "objects"}`` shape as the on-disk prompt-file format
+        (feature 008-level-agnostic-prompts) -- a saved run record's authoring level is visible
+        without computing anything.
+        """
+        objects = []
         for p in self.prompts:
-            out.append(
+            objects.append(
                 {
                     "obj_id": p.obj_id,
                     "frame_index": p.frame_index,
@@ -97,12 +158,23 @@ class PromptSet:
                     "box": None if p.box is None else [float(v) for v in p.box],
                 }
             )
-        return out
+        return {"level": self.level, "objects": objects}
 
 
 def load_prompt_file(path: str | Path) -> PromptSet:
-    """Load a prompt file in the documented JSON format (see contracts/cli.md)."""
+    """Load a prompt file in the documented JSON format (see contracts/cli.md).
+
+    The top-level ``"level"`` key (the pyramid level these coordinates were authored against) is
+    required (feature 008-level-agnostic-prompts, FR-007): a file written before that feature
+    existed, with no ``"level"`` key, is rejected rather than silently reinterpreted.
+    """
     data = json.loads(Path(path).read_text())
+    if "level" not in data:
+        raise PromptError(
+            f'prompt file {path} has no top-level "level" key; this is a pre-feature-008 file '
+            "and cannot be safely reused -- re-author it with the level it was authored against"
+        )
+    level = int(data["level"])
     prompts: list[Prompt] = []
     for obj in data.get("objects", []):
         obj_id = int(obj.get("obj_id", 0))
@@ -128,4 +200,4 @@ def load_prompt_file(path: str | Path) -> PromptSet:
             )
     if not prompts:
         raise PromptError("prompt file contains no prompts")
-    return PromptSet(prompts=prompts)
+    return PromptSet(prompts=prompts, level=level)

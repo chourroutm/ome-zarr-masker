@@ -32,7 +32,12 @@ def _holes(mask: np.ndarray) -> int:
 def _prompts(path: Path) -> Path:
     # a shell voxel on frame 4 at (x, y) = (5, 5)
     path.write_text(
-        json.dumps({"objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [5, 5], "label": 1}]}]})
+        json.dumps(
+            {
+                "level": 0,
+                "objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [5, 5], "label": 1}]}],
+            }
+        )
     )
     return path
 

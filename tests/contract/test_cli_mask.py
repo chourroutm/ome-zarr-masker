@@ -23,13 +23,13 @@ _HAVE_SAM2 = sam2_available()
 requires_sam2 = pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 
 
-def _write_prompts(path: Path, *, points=None, box=None) -> Path:
+def _write_prompts(path: Path, *, points=None, box=None, level=0) -> Path:
     obj: dict = {"obj_id": 0}
     if points is not None:
         obj["points"] = points
     if box is not None:
         obj["box"] = box
-    path.write_text(json.dumps({"objects": [obj]}))
+    path.write_text(json.dumps({"level": level, "objects": [obj]}))
     return path
 
 

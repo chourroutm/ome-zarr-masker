@@ -29,7 +29,12 @@ def _store(tmp_path: Path) -> Path:
 def _prompts(tmp_path: Path) -> Path:
     path = tmp_path / "p.json"
     path.write_text(
-        json.dumps({"objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}]}]})
+        json.dumps(
+            {
+                "level": 0,
+                "objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}]}],
+            }
+        )
     )
     return path
 

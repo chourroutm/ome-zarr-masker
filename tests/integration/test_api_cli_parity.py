@@ -24,7 +24,12 @@ def test_api_and_cli_produce_equivalent_masks(single_blob_zarr, tmp_path):
     prompts_file = tmp_path / "p.json"
     prompts_file.write_text(
         json.dumps(
-            {"objects": [{"obj_id": 0, "points": [{"frame": frame, "xy": [cx, cy], "label": 1}]}]}
+            {
+                "level": 0,
+                "objects": [
+                    {"obj_id": 0, "points": [{"frame": frame, "xy": [cx, cy], "label": 1}]}
+                ],
+            }
         )
     )
     cli_out = tmp_path / "cli.ome.zarr"

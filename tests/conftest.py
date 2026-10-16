@@ -12,18 +12,30 @@ from ome_zarr_models.v05.image import Image
 from pydantic_zarr.v3 import ArraySpec
 
 
-def write_ome_zarr(path: Path, level0: np.ndarray, n_levels: int = 2) -> Path:
-    """Write a minimal valid OME-Zarr v0.5 multiscale image (axes z, y, x)."""
+def write_ome_zarr(
+    path: Path,
+    level0: np.ndarray,
+    n_levels: int = 2,
+    axis_factors: tuple[int, int, int] = (2, 2, 2),
+) -> Path:
+    """Write a minimal valid OME-Zarr v0.5 multiscale image (axes z, y, x).
+
+    ``axis_factors`` is the per-axis (z, y, x) downsample factor between consecutive levels;
+    the default ``(2, 2, 2)`` reproduces every pre-existing caller's isotropic pyramid exactly.
+    Passing different factors per axis builds an anisotropic pyramid (feature
+    008-level-agnostic-prompts, FR-004).
+    """
+    fz, fy, fx = axis_factors
     arrays = [level0]
     for _ in range(1, n_levels):
-        arrays.append(arrays[-1][::2, ::2, ::2].copy())
+        arrays.append(arrays[-1][::fz, ::fy, ::fx].copy())
     axes = [Axis(name=n, type="space") for n in ("z", "y", "x")]
     specs = [ArraySpec.from_array(a, dimension_names=["z", "y", "x"]) for a in arrays]
     image = Image.new(
         array_specs=specs,
         paths=[str(i) for i in range(n_levels)],
         axes=axes,
-        scales=[[2.0**i] * 3 for i in range(n_levels)],
+        scales=[[float(f) ** i for f in axis_factors] for i in range(n_levels)],
         translations=[None] * n_levels,
     )
     image.to_zarr(zarr.storage.LocalStore(str(path)), path="")

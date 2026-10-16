@@ -21,9 +21,14 @@ _HAVE_SAM2 = sam2_available()
 requires_sam2 = pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 
 
-def _prompts(path: Path, frame: int, xy: list[int]) -> Path:
+def _prompts(path: Path, frame: int, xy: list[int], level: int = 0) -> Path:
     path.write_text(
-        json.dumps({"objects": [{"obj_id": 0, "points": [{"frame": frame, "xy": xy, "label": 1}]}]})
+        json.dumps(
+            {
+                "level": level,
+                "objects": [{"obj_id": 0, "points": [{"frame": frame, "xy": xy, "label": 1}]}],
+            }
+        )
     )
     return path
 
@@ -40,7 +45,7 @@ def _run(store, out, prompts, *level):
 def test_valid_level_output_grid_matches_input_levels(single_blob_zarr, tmp_path):
     store, _center, _frame = single_blob_zarr  # level 0 shape (8, 16, 16), blob center (8, 8) @ z=4
     out = tmp_path / "lvl0.ome.zarr"
-    assert _run(store, out, _prompts(tmp_path / "p0.json", 4, [8, 8]), 0) == 0
+    assert _run(store, out, _prompts(tmp_path / "p0.json", 4, [8, 8], level=0), 0) == 0
 
     rin = OmeZarrReader(store)
     rout = OmeZarrReader(out)
@@ -57,9 +62,9 @@ def test_default_level_is_coarsest_when_unspecified(single_blob_zarr, tmp_path):
     store, _center, _frame = single_blob_zarr
     # coarsest level (index 1) has shape (4, 8, 8); the blob there is centred at (4, 4) on frame 2
     out = tmp_path / "default.ome.zarr"
-    assert _run(store, out, _prompts(tmp_path / "pc.json", 2, [4, 4])) == 0
-
     coarsest = OmeZarrReader(store).n_levels - 1
+    assert _run(store, out, _prompts(tmp_path / "pc.json", 2, [4, 4], level=coarsest)) == 0
+
     assert json.loads((out / "run_record.json").read_text())["level"] == coarsest
 
 
