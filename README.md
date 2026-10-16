@@ -47,7 +47,7 @@ Single positive point:
 
 ```bash
 cat > prompts.json <<'JSON'
-{"objects":[{"obj_id":0,"points":[{"frame":120,"xy":[340,512],"label":1}]}]}
+{"level":3,"objects":[{"obj_id":0,"points":[{"frame":120,"xy":[340,512],"label":1}]}]}
 JSON
 
 organ-masker-lite mask input.ome.zarr output.ome.zarr \
@@ -72,6 +72,7 @@ Key options:
 
 ```json
 {
+  "level": 3,
   "objects": [
     {
       "obj_id": 0,
@@ -82,8 +83,10 @@ Key options:
 }
 ```
 
-`label` is `1` for a positive (include) point and `0` for a negative (exclude) point. At least one
-positive point or a box is required.
+`level` is the pyramid level these coordinates were read off of -- it is required, and need not
+match the `--level` the run itself uses: coordinates are automatically converted to whichever level
+`mask` actually runs at. `label` is `1` for a positive (include) point and `0` for a negative
+(exclude) point. At least one positive point or a box is required.
 
 ### Input logging
 
@@ -106,7 +109,7 @@ The API mirrors the SAM/SAM2 predictor structure:
 from organ_masker_lite import OrganMaskPredictor
 
 p = OrganMaskPredictor()
-p.set_volume("input.ome.zarr", level=3)            # mirrors SAM set_image
+p.set_volume("input.ome.zarr", level=3)  # mirrors SAM set_image
 p.add_points(frame_index=120, point_coords=[[340, 512]], point_labels=[1])
 mask = p.predict(axes=["z"], direction="forward")  # returns a MaskResult
 mask.save("api_out.ome.zarr")

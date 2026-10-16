@@ -46,7 +46,9 @@ A landmark on a specific slice/frame. Mirrors the SAM2 prompt-encoder convention
 Validation rules:
 - `point_coords` length MUST equal `point_labels` length.
 - Across the full PromptSet there MUST be at least one positive point or a box (FR-015).
-- Coordinates MUST fall within the selected level's bounds (FR-015); else reject.
+- Coordinates MUST fall within the selected level's bounds (FR-015); else reject. As of feature
+  008-level-agnostic-prompts, this check runs *after* converting the coordinates to the run level's
+  grid (see `PromptSet.level` below) -- bounds are always enforced against the level actually used.
 - Labels MUST be in `{0, 1}` at the API surface; box-corner labels `2/3` and padding `-1` are
   produced internally by the backend, never supplied by the user.
 
@@ -58,6 +60,16 @@ PromptSet between previews.
 Ordered collection of `Prompt`s for one run, grouped by `obj_id` and `frame_index`. Serializable to
 /from the CLI prompt file. Records the three first-to-test shapes:
 1. single positive point, 2. box, 3. positive + exclusion (negative) point.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `level` | `int \| None` | **(feature 008-level-agnostic-prompts)** The pyramid level this set's coordinates were authored against; `None` means "already in whatever level this set is used at". A loaded prompt file or an `OrganMaskPredictor` session always sets it; direct construction defaults to `None`. |
+
+When `level` differs from the level a run actually uses, every coordinate (`frame_index`,
+`point_coords`, `box`) is converted to the run level's pixel grid -- via each axis's own shape
+ratio between the two levels, nearest-pixel rounding -- before validation. See
+`specs/008-level-agnostic-prompts/data-model.md` for the full mechanism, and
+`specs/008-level-agnostic-prompts/contracts/prompt-file-format.md` for the on-disk schema.
 
 ## RunConfig
 

@@ -38,6 +38,7 @@ organ-masker-lite mask INPUT OUTPUT --prompts PROMPTS [options]
 A small text format (JSON) listing prompts; mirrors the API convention:
 ```json
 {
+  "level": 4,
   "objects": [
     {
       "obj_id": 0,
@@ -47,6 +48,11 @@ A small text format (JSON) listing prompts; mirrors the API convention:
   ]
 }
 ```
+- `level` (**required**, as of feature 008-level-agnostic-prompts): the pyramid level these
+  coordinates were read off of. It need not match this run's own `--level` -- coordinates are
+  automatically converted to whichever level the run actually uses. A file with no `level` key
+  (the pre-008 format) is rejected with a clear error, never silently reinterpreted; see
+  `specs/008-level-agnostic-prompts/contracts/prompt-file-format.md`.
 - `label`: `1` positive, `0` negative/exclusion (SAM2 convention).
 - `box` optional; at least one positive point or a box is required overall (FR-015).
 
