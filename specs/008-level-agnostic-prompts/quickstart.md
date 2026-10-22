@@ -49,7 +49,7 @@ echo $?   # expect 1, error names available levels, out.ome.zarr not created
 Expected: both exit non-zero with an actionable message, and neither leaves a partial `out.ome.zarr`
 (mirrors the existing C-CLI-4 no-partial-output guarantee). Validates C-PF-3, C-PF-4.
 
-## 4. Anisotropic pyramid: each axis converts by its own ratio (Acceptance Scenario 3, FR-004)
+## 4. Anisotropic pyramid: each axis converts by its own scale (Acceptance Scenario 3, FR-004)
 
 ```python
 from organ_masker_lite.config import RunConfig

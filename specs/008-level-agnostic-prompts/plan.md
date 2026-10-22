@@ -12,9 +12,9 @@ level silently shifts every point and produces a wrong mask with no error (the b
 feature). This feature adds one `level` field to `PromptSet` (authoring level, a traceability trace --
 FR-002/FR-003) and one conversion step in the pipeline: before validating prompts against the run
 level's shape, convert every coordinate from the authoring level's pixel grid to the run level's pixel
-grid using the exact per-axis shape ratio between the two levels (the same nested-grid relationship
-`io/writer.py` already relies on to resample mask output across levels) -- no new coordinate system,
-no new dependency. The on-disk prompt-file JSON gains a required top-level `"level"` key; files
+grid by physical position (each level's scale and translation, nearest pixel centre, ties to the
+lower pixel; reworked 2026-10-16 from an original shape-ratio conversion, see research R8) -- no new
+coordinate system, no new dependency. The on-disk prompt-file JSON gains a required top-level `"level"` key; files
 written in the old, level-less format are rejected with a clear error (FR-007) rather than
 silently reinterpreted.
 
@@ -114,7 +114,7 @@ specs/008-level-agnostic-prompts/
 ```text
 src/organ_masker_lite/
 ├── prompts/
-│   └── model.py             # CHANGED: PromptSet.level field; shape-ratio conversion method;
+│   └── model.py             # CHANGED: PromptSet.level field; physical conversion method;
 │                             #          load_prompt_file requires "level"; to_record() wraps
 │                             #          {"level", "objects"}
 ├── engine/

@@ -14,9 +14,18 @@ from pathlib import Path
 
 import numpy as np
 
+from ..geometry import nearest_index
+
+#: A pyramid level's ``(scale, translation)``, one value per axis.
+LevelGeometry = tuple[tuple[float, ...], tuple[float, ...]]
+
 
 class PromptError(ValueError):
     """Raised when a prompt or prompt set is invalid."""
+
+
+def _same_geometry(a: LevelGeometry, b: LevelGeometry) -> bool:
+    return tuple(map(tuple, a)) == tuple(map(tuple, b))
 
 
 @dataclass
@@ -65,54 +74,68 @@ class PromptSet:
     def has_positive(self) -> bool:
         return any(p.point_labels.tolist().count(1) or p.box is not None for p in self.prompts)
 
-    def resolved_for_shape(
-        self, src_shape: tuple[int, ...], dst_shape: tuple[int, ...], axis_index: int
+    def resolved_between(
+        self, src_geometry: LevelGeometry, dst_geometry: LevelGeometry, axis_index: int
     ) -> PromptSet:
-        """Convert every prompt's coordinates from ``src_shape``'s pixel grid to ``dst_shape``'s.
+        """Convert every prompt from one level's pixel grid to another's by physical position.
 
-        Uses the same nested-grid relationship between pyramid levels that mask resampling
-        (``io/writer.py``) already relies on: the ratio of shapes along each axis (FR-004). Returns
-        ``self`` unchanged when the shapes are equal (FR-006) -- a true identity, not a recomputed
-        ratio-of-1.0. ``axis_index`` is the sweep axis; the other two axes are "height" and "width"
-        in the same order :meth:`validate` uses, so the two stay consistent by construction.
+        Each geometry is ``(scale, translation)`` per axis, from the level's OME-Zarr
+        ``coordinateTransformations``. Every coordinate (frame index, point, box corner) goes to its
+        physical position on the source level and snaps to the nearest pixel centre on the target
+        level, exact ties to the lower pixel -- the same rule the mask writer uses (FR-004).
+        Returns ``self`` when both geometries match (FR-006). ``axis_index`` is the sweep axis; the
+        other two axes are "height" and "width" in the order :meth:`validate` uses.
         """
-        if tuple(src_shape) == tuple(dst_shape):
+        if _same_geometry(src_geometry, dst_geometry):
             return self
-        remaining = [i for i in range(len(src_shape)) if i != axis_index]
+        (src_scale, src_trans), (dst_scale, dst_trans) = src_geometry, dst_geometry
+        remaining = [i for i in range(len(src_scale)) if i != axis_index]
         height_axis, width_axis = remaining[0], remaining[1]
-        frame_ratio = dst_shape[axis_index] / src_shape[axis_index]
-        height_ratio = dst_shape[height_axis] / src_shape[height_axis]
-        width_ratio = dst_shape[width_axis] / src_shape[width_axis]
 
-        def convert(p: Prompt) -> Prompt:
-            coords = p.point_coords.copy()
-            if coords.size:
-                coords[:, 0] = np.round(coords[:, 0] * width_ratio)
-                coords[:, 1] = np.round(coords[:, 1] * height_ratio)
-            box = None
-            if p.box is not None:
-                x0, y0, x1, y1 = p.box
-                box = np.array(
-                    [
-                        round(x0 * width_ratio),
-                        round(y0 * height_ratio),
-                        round(x1 * width_ratio),
-                        round(y1 * height_ratio),
-                    ],
-                    dtype=float,
-                )
+        def along(axis: int, values: np.ndarray) -> np.ndarray:
+            return nearest_index(
+                values, src_scale[axis], src_trans[axis], dst_scale[axis], dst_trans[axis]
+            )
+
+        # One vectorised call per axis across all prompts keeps large sets within the budget.
+        frames = along(axis_index, np.array([p.frame_index for p in self.prompts]))
+        counts = [p.point_coords.shape[0] for p in self.prompts]
+        points = (
+            np.concatenate([p.point_coords for p in self.prompts])
+            if self.prompts
+            else np.empty((0, 2))
+        )
+        points = np.column_stack(
+            [along(width_axis, points[:, 0]), along(height_axis, points[:, 1])]
+        ).astype(float)
+        point_groups = np.split(points, np.cumsum(counts)[:-1]) if self.prompts else []
+        boxed = [i for i, p in enumerate(self.prompts) if p.box is not None]
+        boxes = {}
+        if boxed:
+            b = np.stack([self.prompts[i].box for i in boxed])
+            converted = np.column_stack(
+                [
+                    along(width_axis, b[:, 0]),
+                    along(height_axis, b[:, 1]),
+                    along(width_axis, b[:, 2]),
+                    along(height_axis, b[:, 3]),
+                ]
+            ).astype(float)
+            boxes = dict(zip(boxed, converted, strict=True))
+
+        out = []
+        for i, p in enumerate(self.prompts):
             # Bypass Prompt's validating __init__/__post_init__: these values are already valid
             # (same shapes, same labels, box already a (4,) float array) by construction, and
             # re-validating them dominates cost for large prompt sets (plan.md's perf budget).
             new = Prompt.__new__(Prompt)
-            new.frame_index = round(p.frame_index * frame_ratio)
-            new.point_coords = coords
+            new.frame_index = int(frames[i])
+            new.point_coords = point_groups[i].reshape(-1, 2)
             new.point_labels = p.point_labels
-            new.box = box
+            new.box = boxes.get(i)
             new.obj_id = p.obj_id
-            return new
-
-        return PromptSet(prompts=[convert(p) for p in self.prompts], level=self.level)
+            out.append(new)
+        return PromptSet(prompts=out, level=self.level)
 
     def validate(self, level_shape: tuple[int, ...], axis_index: int) -> None:
         """Validate prompts against the selected level (FR-015).

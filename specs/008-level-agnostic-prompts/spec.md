@@ -8,6 +8,17 @@
 
 **Input**: User description: "save the prompts in level-agnostic coordinates, but keep a trace at which level they were given"
 
+## Clarifications
+
+### Session 2026-10-16 (rework, aligned with feature 009-scalable-mask-writer)
+
+- Q: How should prompt coordinates be converted between pyramid levels? → A: By physical position,
+  using each level's scale and translation from the input's metadata (scale 1, translation 0 when
+  absent), snapping to the nearest pixel centre with exact ties to the lower pixel. This is the same
+  rule feature 009 uses to resample the mask. It replaces the earlier shape-ratio + round-half-to-even
+  conversion, which ignored translations and drifted by one pixel on non-exact pyramids (e.g. the
+  DANDI 001278 input, which has half-pixel translations).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Rerun masking at a different level without re-authoring prompts (Priority: P1)
@@ -82,8 +93,9 @@ coordinate being silently misapplied.
 
 ### Edge Cases
 
-- A point placed very close to the edge of the frame at a coarse level may, after conversion, round to
-  a pixel just outside the bounds of a much finer level; the system must still raise the existing
+- On a consistent pyramid, physical mapping keeps an in-bounds point in bounds (e.g. the last column
+  of a 16-wide level lands on 7.5 at half resolution and resolves to 7). If a level's metadata
+  nevertheless maps a point outside the run level, the system must still raise the existing
   out-of-bounds validation error rather than clamping silently.
 - The sweep axis may be downsampled by a different factor than the in-plane axes (anisotropic
   pyramids); frame-index conversion must use that axis's own factor, not the in-plane factor.
@@ -106,7 +118,9 @@ coordinate being silently misapplied.
   in order to use the prompt, and MUST NOT by itself restrict or determine which level a later run uses.
 - **FR-004**: When the masking pipeline runs at a given level, System MUST resolve every stored prompt
   coordinate (points, box corners, and sweep-axis frame index) to that level's pixel grid before use,
-  correctly accounting for cases where axes are downsampled by different factors across levels.
+  by physical position: map the coordinate through the authoring level's scale and translation, then
+  take the nearest pixel centre on the run level, with exact ties to the lower pixel. Each axis uses
+  its own scale and translation, so axes downsampled by different factors are handled.
 - **FR-005**: System MUST validate the resolved, level-specific coordinates against the selected run
   level's bounds and raise the existing actionable out-of-bounds error when they fall outside it, even
   when the original authored coordinate was in-bounds at its own level.
@@ -146,15 +160,16 @@ coordinate being silently misapplied.
 
 ## Assumptions
 
-- The level-agnostic coordinate representation relies on the same nested-grid relationship between
-  pyramid levels that the mask writer already uses to resample its output across levels (per feature
-  001-ome-zarr-sam-masking): a level's shape tells you exactly how many of its pixels correspond to one
-  pixel of any other level. No new, separately-tracked physical unit system is introduced.
+- The level-agnostic coordinate representation relies on the physical coordinate system the input
+  already declares: each level's scale and translation in its OME-Zarr metadata (see
+  Clarifications). Prompt coordinates stay pixels at the authoring level; no new unit system is
+  stored.
 - This is a breaking change to the prompt file's on-disk schema (FR-007): no automatic migration path
   for prompt files saved before this feature is in scope. Existing saved prompt files must be
   re-authored (via the interactive tool) after upgrading.
-- Coordinate conversion between levels resolves to the nearest pixel on the target level's grid,
-  consistent with the nearest-neighbor convention already used when resampling masks across levels.
+- Coordinate conversion between levels resolves to the nearest pixel centre on the target level's
+  grid, exact ties to the lower pixel: the same rule the mask writer uses (feature 009), so prompts
+  and the written mask agree on which voxel a physical position belongs to.
 - A prompt set is always reused against the same input volume (the same OME-Zarr store) it was
   originally authored against, only potentially at a different level of that same store's pyramid;
   reuse across genuinely different input volumes is out of scope.

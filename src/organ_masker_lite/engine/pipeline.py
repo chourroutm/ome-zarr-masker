@@ -152,8 +152,8 @@ def compute_mask(
                 f"prompt set was authored at level {prompts.level}, which does not exist for "
                 f"this input; available levels: {reader.describe_levels()}"
             )
-        prompts = prompts.resolved_for_shape(
-            reader.level_shape(prompts.level), level_shape, prompted_index
+        prompts = prompts.resolved_between(
+            reader.level_transform(prompts.level), reader.level_transform(level), prompted_index
         )
 
     # The user places landmarks on the prompted axis's planes; validate against that axis (FR-022).

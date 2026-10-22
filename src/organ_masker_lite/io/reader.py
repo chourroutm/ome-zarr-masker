@@ -73,6 +73,18 @@ class OmeZarrReader:
     def level_shape(self, level: int) -> tuple[int, ...]:
         return self.levels[level].shape
 
+    def level_transform(self, level: int) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        """The level's ``(scale, translation)`` per axis; 1 and 0 where the metadata omits them."""
+        ndim = len(self.axes)
+        scale = (1.0,) * ndim
+        translation = (0.0,) * ndim
+        for t in self._datasets[level].coordinateTransformations:
+            if getattr(t, "scale", None) is not None:
+                scale = tuple(float(v) for v in t.scale)
+            if getattr(t, "translation", None) is not None:
+                translation = tuple(float(v) for v in t.translation)
+        return scale, translation
+
     def read_level(self, level: int) -> np.ndarray:
         """Read a level fully into memory (callers choose a level small enough to fit)."""
         return np.asarray(self._open_array(self._datasets[level].path)[:])

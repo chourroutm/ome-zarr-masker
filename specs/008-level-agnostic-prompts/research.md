@@ -5,7 +5,7 @@
 No `[NEEDS CLARIFICATION]` markers remained in the spec, so this phase resolves implementation-level
 design questions against the existing codebase rather than open unknowns.
 
-## R1: What "level-agnostic" actually resolves to
+## R1: What "level-agnostic" actually resolves to (conversion part superseded by R8)
 
 **Decision**: A prompt's coordinates stay exactly what they are today -- pixels in the authoring
 level's own grid -- plus one new integer, the authoring level index, on the `PromptSet`. "Level
@@ -59,7 +59,7 @@ rejected: it would force a mass, purely-mechanical edit of every internal/test `
 in the codebase (pipeline-internal seed prompts included) for no behavioral benefit, since none of
 those call sites represent a "saved, reused-later" prompt in the sense this feature is about.
 
-## R3: The conversion itself
+## R3: The conversion itself (superseded by R8)
 
 **Decision**: A `PromptSet` method taking the authoring level's shape, the target level's shape, and
 the sweep-axis index, returning a new `PromptSet`:
@@ -137,3 +137,30 @@ pyramid can't distinguish "correct per-axis conversion" from "a single scalar ra
 
 **Rationale**: Without this, the anisotropic path in R3 would be implemented but untestable --
 violating Constitution II (every behavioral change backed by a test that can actually fail).
+
+## R8: Rework (2026-10-16) -- physical mapping, shared with feature 009
+
+**Decision**: Replace the shape-ratio conversion (R1/R3) with physical mapping. Each coordinate goes
+to its physical position on the authoring level (`i * scale + translation`, from the level's
+OME-Zarr `coordinateTransformations`; scale 1 and translation 0 when absent). It then snaps to the
+nearest pixel centre on the run level, with exact ties to the lower pixel. The formula lives in
+`src/organ_masker_lite/geometry.py::nearest_index`, so feature 009's mask writer can reuse it.
+`OmeZarrReader.level_transform(level)` exposes each level's `(scale, translation)`.
+`PromptSet.resolved_for_shape(src_shape, dst_shape, axis)` became
+`PromptSet.resolved_between(src_geometry, dst_geometry, axis)`, vectorised across all prompts
+(one call per axis).
+
+**Rationale**:
+- Feature 009 measured the shape-ratio approach against the real DANDI 001278 pyramid (half-pixel
+  translations `(scale_N - scale_0)/2`, non-exact shape ratios such as 874 -> 1747). It was off by
+  one pixel on 6-25% of planes at the finer levels.
+- The R1 concern ("a second mechanism that disagrees with the writer") is resolved the other way
+  around: the writer itself moves to physical mapping (009 FR-006), so prompts and mask share one
+  rule.
+- For translation-free pyramids with exact ratios (this repo's fixtures), results are unchanged
+  except at exact ties. There, the old round-half-to-even picked the even pixel and the new rule
+  picks the lower one (e.g. x = 15 at full resolution -> 7.5 -> 7, previously 8 and out of bounds).
+
+**Consequences for tests**: the edge-case integration test that relied on that round-half-to-even
+artifact (15 -> 8, out of bounds) now forces a genuinely out-of-bounds conversion by shifting the
+run level's translation. The tie case itself is a unit test (x = 15 -> 7, in bounds).

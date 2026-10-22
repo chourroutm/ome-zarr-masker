@@ -45,6 +45,33 @@ def test_read_level_returns_data(tmp_path):
     assert vol.max() == 200
 
 
+def test_level_transform_defaults_translation_to_zero(tmp_path):
+    r = OmeZarrReader(_make(tmp_path, n_levels=3))  # fixture writes scales 2**i, no translations
+    assert r.level_transform(0) == ((1.0, 1.0, 1.0), (0.0, 0.0, 0.0))
+    assert r.level_transform(2) == ((4.0, 4.0, 4.0), (0.0, 0.0, 0.0))
+
+
+def test_level_transform_reads_scale_and_translation(tmp_path):
+    import zarr
+    from ome_zarr_models.v05.axes import Axis
+    from ome_zarr_models.v05.image import Image
+    from pydantic_zarr.v3 import ArraySpec
+
+    arrays = [np.zeros((8, 8, 8), np.uint8), np.zeros((4, 4, 4), np.uint8)]
+    path = tmp_path / "t.ome.zarr"
+    Image.new(
+        array_specs=[ArraySpec.from_array(a, dimension_names=["z", "y", "x"]) for a in arrays],
+        paths=["0", "1"],
+        axes=[Axis(name=n, type="space") for n in ("z", "y", "x")],
+        scales=[[1.0, 1.0, 1.0], [2.0, 2.0, 2.0]],
+        translations=[None, [0.5, 0.5, 0.5]],
+    ).to_zarr(zarr.storage.LocalStore(str(path)), path="")
+    r = OmeZarrReader(path)
+    assert r.level_transform(1) == ((2.0, 2.0, 2.0), (0.5, 0.5, 0.5))
+    assert r.level_transform(0) == ((1.0, 1.0, 1.0), (0.0, 0.0, 0.0))
+
+
 def test_bad_path_raises(tmp_path):
     with pytest.raises(ReaderError):
         OmeZarrReader(tmp_path / "does-not-exist.ome.zarr")
+

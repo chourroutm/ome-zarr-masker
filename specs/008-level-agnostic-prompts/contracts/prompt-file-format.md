@@ -60,8 +60,10 @@ differently.
 - C-PF-4: A prompt file whose `"level"` does not exist in `INPUT`'s pyramid is rejected with a clear
   error naming the available levels (spec User Story 3).
 - C-PF-5: A point that lands in-bounds at its authoring level but out-of-bounds after conversion to
-  the run level is still rejected by the existing bounds check (spec Edge Cases).
-- C-PF-6: Conversion uses each axis's own ratio -- correct even when the sweep axis and the in-plane
+  the run level (only possible when level metadata maps it there) is still rejected by the existing
+  bounds check, never clamped (spec Edge Cases).
+- C-PF-6: Conversion maps each axis through that axis's own scale and translation to the nearest
+  pixel centre, exact ties to the lower pixel -- correct even when the sweep axis and the in-plane
   axes are downsampled by different factors between the two levels (spec Acceptance Scenario 3).
 - C-PF-7: `OrganMaskPredictor.predict()`'s saved run record and a CLI run against an equivalent prompt
   file record the same authoring level (API/CLI parity, mirrors existing C-API-6/C-CLI-6).

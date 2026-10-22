@@ -138,60 +138,101 @@ def test_to_record_level_is_none_when_unset():
     assert ps.to_record()["level"] is None
 
 
-# -- PromptSet.resolved_for_shape (feature 008-level-agnostic-prompts) --------------------------
+# -- PromptSet.resolved_between: physical mapping between levels -------------------------------
+# A level's geometry is (scale, translation) per (z, y, x) axis, as in its OME-Zarr metadata.
 
 
-def test_resolved_for_shape_identity_when_shapes_equal():
+def _geo(scale, translation=(0.0, 0.0, 0.0)):
+    return (tuple(float(s) for s in scale), tuple(float(t) for t in translation))
+
+
+def test_resolved_between_identity_when_geometry_matches():
     ps = PromptSet(
         [Prompt(frame_index=2, point_coords=[[3, 4]], point_labels=[1], box=[1, 1, 5, 5])],
         level=0,
     )
-    out = ps.resolved_for_shape((4, 8, 8), (4, 8, 8), axis_index=0)
-    assert out is ps
+    g = _geo((2, 2, 2), (0.5, 0.5, 0.5))
+    assert ps.resolved_between(g, g, axis_index=0) is ps
 
 
-def test_resolved_for_shape_isotropic_conversion():
+def test_resolved_between_isotropic_upsample():
     ps = PromptSet(
         [Prompt(frame_index=1, point_coords=[[2, 3]], point_labels=[1], box=[1, 1, 3, 3])]
     )
-    out = ps.resolved_for_shape((4, 8, 8), (8, 16, 16), axis_index=0)
+    out = ps.resolved_between(_geo((2, 2, 2)), _geo((1, 1, 1)), axis_index=0)
     p = out.prompts[0]
     assert p.frame_index == 2
     assert p.point_coords.tolist() == [[4, 6]]
     assert p.box.tolist() == [2, 2, 6, 6]
 
 
-def test_resolved_for_shape_sweep_axis_ratio_independent_of_in_plane_ratio():
+def test_resolved_between_sweep_axis_independent_of_in_plane_axes():
     """The sweep axis (frame_index) may scale by a different factor than the in-plane axes."""
     ps = PromptSet([Prompt(frame_index=1, point_coords=[[2, 3]], point_labels=[1])])
-    out = ps.resolved_for_shape((4, 8, 8), (8, 8, 8), axis_index=0)
+    out = ps.resolved_between(_geo((2, 1, 1)), _geo((1, 1, 1)), axis_index=0)
     p = out.prompts[0]
     assert p.frame_index == 2  # sweep axis (z) doubled
     assert p.point_coords.tolist() == [[2, 3]]  # in-plane axes unchanged
 
 
-def test_resolved_for_shape_height_and_width_scale_independently():
-    """x (width) and y (height) may scale by different factors from each other too."""
+def test_resolved_between_height_and_width_scale_independently():
+    """x (width, axis 2) and y (height, axis 1) may scale by different factors too."""
     ps = PromptSet([Prompt(frame_index=0, point_coords=[[2, 3]], point_labels=[1])])
-    out = ps.resolved_for_shape((4, 8, 8), (4, 16, 24), axis_index=0)
-    # height (axis 1) ratio 16/8=2 -> y: 3*2=6; width (axis 2) ratio 24/8=3 -> x: 2*3=6
+    out = ps.resolved_between(_geo((1, 2, 3)), _geo((1, 1, 1)), axis_index=0)
+    # y: 3 * 2 = 6; x: 2 * 3 = 6
     assert out.prompts[0].point_coords.tolist() == [[6, 6]]
 
 
-def test_resolved_for_shape_rounds_to_nearest_pixel():
+def test_resolved_between_rounds_to_nearest_pixel():
     ps = PromptSet([Prompt(frame_index=0, point_coords=[[3, 0]], point_labels=[1])])
-    out = ps.resolved_for_shape((4, 8, 8), (4, 8, 10), axis_index=0)
-    # width ratio 10/8=1.25; 3*1.25=3.75 rounds to 4, not floors to 3
+    out = ps.resolved_between(_geo((1, 1, 1.25)), _geo((1, 1, 1)), axis_index=0)
+    # x: 3 * 1.25 = 3.75 rounds to 4, not floors to 3
     assert out.prompts[0].point_coords.tolist() == [[4, 0]]
 
 
-def test_resolved_for_shape_preserves_level_attribute():
+def test_resolved_between_exact_tie_goes_to_lower_index():
+    """Same rule as the mask writer (feature 009): an exact tie picks the lower pixel. The last
+    column (x=15) of a 16-wide level lands on 7.5 at half resolution and stays in bounds (7)."""
+    ps = PromptSet([Prompt(frame_index=4, point_coords=[[15, 15]], point_labels=[1])])
+    out = ps.resolved_between(_geo((1, 1, 1)), _geo((2, 2, 2)), axis_index=0)
+    p = out.prompts[0]
+    assert p.frame_index == 2
+    assert p.point_coords.tolist() == [[7, 7]]
+    out.validate(level_shape=(4, 8, 8), axis_index=0)  # no raise
+
+
+def test_resolved_between_uses_half_pixel_translations():
+    """DANDI-style pyramid: translation_N = (scale_N - scale_0) / 2. A level-1 voxel centre sits
+    between two level-0 centres, so it maps to the lower one; a level-0 centre maps into the level-1
+    voxel that contains it."""
+    lvl0 = _geo((1, 1, 1), (0, 0, 0))
+    lvl1 = _geo((2, 2, 2), (0.5, 0.5, 0.5))
+    ps = PromptSet([Prompt(frame_index=3, point_coords=[[3, 5]], point_labels=[1])])
+    up = ps.resolved_between(lvl1, lvl0, axis_index=0).prompts[0]
+    assert up.frame_index == 6  # 3*2 + 0.5 = 6.5 -> tie -> 6
+    assert up.point_coords.tolist() == [[6, 10]]
+    down = ps.resolved_between(lvl0, lvl1, axis_index=0).prompts[0]
+    assert down.frame_index == 1  # (3 - 0.5) / 2 = 1.25 -> 1
+    assert down.point_coords.tolist() == [[1, 2]]  # x: 1.25 -> 1; y: (5 - 0.5)/2 = 2.25 -> 2
+
+
+def test_resolved_between_out_of_bounds_result_still_fails_validation():
+    """Conversion never clamps: if metadata maps a point outside the run level, validate() rejects
+    it (spec FR-005)."""
+    ps = PromptSet([Prompt(frame_index=0, point_coords=[[1, 1]], point_labels=[1])])
+    out = ps.resolved_between(_geo((1, 1, 1)), _geo((1, 1, 1), (0, 0, -100)), axis_index=0)
+    assert out.prompts[0].point_coords.tolist() == [[101, 1]]
+    with pytest.raises(PromptError):
+        out.validate(level_shape=(4, 8, 8), axis_index=0)
+
+
+def test_resolved_between_preserves_level_attribute():
     ps = PromptSet([Prompt(frame_index=1, point_coords=[[2, 3]], point_labels=[1])], level=0)
-    out = ps.resolved_for_shape((4, 8, 8), (8, 16, 16), axis_index=0)
+    out = ps.resolved_between(_geo((2, 2, 2)), _geo((1, 1, 1)), axis_index=0)
     assert out.level == 0
 
 
-def test_resolved_for_shape_meets_performance_budget():
+def test_resolved_between_meets_performance_budget():
     """plan.md's declared budget: < 4 ms for 500 prompts (a generous ceiling for a thorough
     multi-frame annotation; Constitution Principle IV). Also guards against regressing to a
     per-prompt reconstruction that re-validates through Prompt's full __init__/__post_init__,
@@ -206,6 +247,6 @@ def test_resolved_for_shape_meets_performance_budget():
         ]
     )
     start = time.perf_counter()
-    ps.resolved_for_shape((4, 8, 8), (8, 16, 16), axis_index=0)
+    ps.resolved_between(_geo((2, 2, 2)), _geo((1, 1, 1)), axis_index=0)
     elapsed = time.perf_counter() - start
-    assert elapsed < 4e-3, f"resolved_for_shape took {elapsed * 1000:.3f} ms for 500 prompts"
+    assert elapsed < 4e-3, f"resolved_between took {elapsed * 1000:.3f} ms for 500 prompts"

@@ -137,17 +137,24 @@ def test_same_level_rerun_is_byte_identical(single_blob_zarr, tmp_path):
     assert record_a == record_b
 
 
-@pytest.mark.real_backend
-@requires_sam2
-def test_out_of_bounds_after_conversion_still_raises(single_blob_zarr, tmp_path):
-    """Edge Cases: a point in-bounds at its authoring level can round to just outside the bounds
-    of a much coarser run level (level 0's last valid column, x=15 of width 16, converts to x=8
-    of the coarsest level's width-8 grid via round-half-to-even -- exactly out of bounds); the
-    existing out-of-bounds check must still catch it rather than clamping silently.
+def test_out_of_bounds_after_conversion_still_raises(single_blob_zarr, tmp_path, monkeypatch):
+    """Edge Cases / FR-005: if a level's metadata maps an in-bounds authored point outside the run
+    level, the pipeline's existing bounds check rejects it instead of clamping. Physical mapping
+    keeps points in bounds on a consistent pyramid, so the run level's translation is shifted here
+    to force the case. Fails before segmentation, so no SAM2 is needed.
     """
-    store, _center, frame = single_blob_zarr
+    store, (cx, cy), frame = single_blob_zarr
     coarsest = OmeZarrReader(store).n_levels - 1
-    prompts = _prompts(tmp_path / "edge.json", frame, [15, 15], level=0)
+    real = OmeZarrReader.level_transform
+
+    def shifted(self, level):
+        scale, translation = real(self, level)
+        if level == coarsest:
+            translation = (translation[0], translation[1], translation[2] - 1000.0)
+        return scale, translation
+
+    monkeypatch.setattr(OmeZarrReader, "level_transform", shifted)
+    prompts = _prompts(tmp_path / "edge.json", frame, [cx, cy], level=0)
     out = tmp_path / "edge.ome.zarr"
 
     code = _run(store, out, prompts, coarsest)

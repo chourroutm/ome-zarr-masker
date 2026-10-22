@@ -238,6 +238,40 @@ input's pyramid, run the pipeline, and confirm a clear, actionable error is rais
 
 ---
 
+## Phase 7: Rework to physical mapping (2026-10-16, aligned with feature 009)
+
+**Purpose**: Replace the shape-ratio conversion with the physical mapping chosen in
+`specs/009-scalable-mask-writer` (spec Clarifications, research R8), so prompts and the written mask
+use one rule.
+
+- [X] T039 Write failing unit tests in `tests/unit/test_geometry.py` for
+  `geometry.nearest_index(coords, from_scale, from_translation, to_scale, to_translation)`: identity,
+  ×2 down/up-sampling, ties to the lower index, a brute-force nearest-centre check on the real DANDI
+  001278 level-3 → level-0 transforms, int64 and unclipped output
+- [X] T040 Write failing unit tests in `tests/unit/test_reader.py` for
+  `OmeZarrReader.level_transform(level)`: translation defaults to zeros on the existing fixture; scale
+  and translation are read from a store with explicit translations
+- [X] T041 Rewrite the conversion unit tests in `tests/unit/test_prompts.py` against
+  `PromptSet.resolved_between(src_geometry, dst_geometry, axis_index)`: identity, isotropic,
+  sweep-axis independence, height/width independence, nearest-pixel rounding, exact tie to the lower
+  pixel (x = 15 → 7, in bounds), half-pixel translations in both directions, out-of-bounds result
+  still rejected by `validate()`, level preserved, 500-prompt performance budget
+- [X] T042 Rework `test_out_of_bounds_after_conversion_still_raises` in
+  `tests/integration/test_us3_levels.py`: monkeypatch `OmeZarrReader.level_transform` to shift the run
+  level's translation so a correctly authored point maps out of bounds, and assert exit 1 with no
+  output (no SAM2 needed; the old version relied on a round-half-to-even artifact)
+- [X] T043 Add `src/organ_masker_lite/geometry.py::nearest_index` and
+  `src/organ_masker_lite/io/reader.py::OmeZarrReader.level_transform` (makes T039–T040 pass)
+- [X] T044 Replace `PromptSet.resolved_for_shape` with `PromptSet.resolved_between` in
+  `src/organ_masker_lite/prompts/model.py` (vectorised: one `nearest_index` call per axis across all
+  prompts; `Prompt.__new__` bypass kept) and call it from `src/organ_masker_lite/engine/pipeline.py`
+  with `reader.level_transform(prompts.level)` / `reader.level_transform(level)` (makes T041–T042 pass)
+- [X] T045 Update this feature's spec (Clarifications, FR-004, Edge Cases, Assumptions), research (R8;
+  R1/R3 marked superseded), data-model, contract (C-PF-5/6), plan and quickstart; full regression
+  green (`ruff check src tests`, `ruff format --check src tests`, `pytest -q`)
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
