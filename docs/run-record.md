@@ -11,7 +11,7 @@ they share one engine.
 ```
 output.ome.zarr/
 ├── zarr.json            # OME-Zarr v0.5 multiscale metadata
-├── 0/ 1/ ...            # mask pyramid levels (binary uint8, same level count as the input)
+├── 0/ 1/ ...            # mask pyramid levels (uint8 0/1, sharded + compressed, same levels as the input)
 └── run_record.json      # this record
 ```
 
@@ -19,6 +19,7 @@ output.ome.zarr/
 
 | Field | Type | Meaning |
 |-------|------|---------|
+| `run_id` | string | Identifier of this invocation; matches the input log `<log-dir>/<run_id>.log`. |
 | `input` | string | Path to the input OME-Zarr v0.5 store. |
 | `level` | int | Resolved multiscale level the run operated on (the coarsest level if the request used the default). |
 | `config.backend` | string | Always `"sam2"`; recorded for provenance (SAM2 is the only segmentation backend). |
@@ -31,7 +32,9 @@ output.ome.zarr/
 | `config.postprocess.erosion_radius` | int | Erosion iterations applied (default `0`). |
 | `config.model_dir` | string | Resolved weights directory (explicit > `ORGAN_MASKER_MODEL_DIR` > `./organ_masker_models`). |
 | `config.allow_download` | bool | Whether missing weights may be auto-downloaded. |
-| `prompts` | list | One entry per prompt: `obj_id`, `frame_index`, `points` (`xy` in `(x, y)`, `label` 1=positive/0=negative), and `box` (`[x0, y0, x1, y1]` or `null`). |
+| `prompts.level` | int | Pyramid level the prompt coordinates were authored at (they were converted to `level` for the run). |
+| `prompts.objects` | list | One entry per prompt: `obj_id`, `frame_index`, `points` (`xy` in `(x, y)`, `label` 1=positive/0=negative), and `box` (`[x0, y0, x1, y1]` or `null`), in authoring-level coordinates. |
+| `output_layout` | list | One entry per output level: `level`, `shape`, `chunks`, `shards`, `compressor` (`blosc` zstd/3/bitshuffle) and `source` (`input` if copied from a sharded input level, else `default`). Contains no worker count, so it doesn't vary with `--workers`. |
 
 ## Example
 
@@ -44,6 +47,7 @@ organ-masker-lite mask input.ome.zarr output.ome.zarr \
 
 ```json
 {
+  "run_id": "20261016T120000Z-1a2b3c4d5e6f",
   "input": "/data/input.ome.zarr",
   "level": 0,
   "config": {
@@ -60,13 +64,24 @@ organ-masker-lite mask input.ome.zarr output.ome.zarr \
     "model_dir": "/data/organ_masker_models",
     "allow_download": true
   },
-  "prompts": [
-    {
-      "obj_id": 0,
-      "frame_index": 4,
-      "points": [{"xy": [8.0, 8.0], "label": 1}],
-      "box": [4.0, 4.0, 12.0, 12.0]
-    }
+  "prompts": {
+    "level": 0,
+    "objects": [
+      {
+        "obj_id": 0,
+        "frame_index": 4,
+        "points": [{"xy": [8.0, 8.0], "label": 1}],
+        "box": [4.0, 4.0, 12.0, 12.0]
+      }
+    ]
+  },
+  "output_layout": [
+    {"level": 0, "shape": [8, 16, 16], "chunks": [64, 64, 64], "shards": [64, 64, 64],
+     "compressor": {"name": "blosc", "cname": "zstd", "clevel": 3, "shuffle": "bitshuffle"},
+     "source": "default"},
+    {"level": 1, "shape": [4, 8, 8], "chunks": [64, 64, 64], "shards": [64, 64, 64],
+     "compressor": {"name": "blosc", "cname": "zstd", "clevel": 3, "shuffle": "bitshuffle"},
+     "source": "default"}
   ]
 }
 ```
@@ -75,5 +90,5 @@ organ-masker-lite mask input.ome.zarr output.ome.zarr \
 
 The record is sufficient to reconstruct the command: read `level`, `config.axes`,
 `config.direction`, `config.combine_rule`, and `config.postprocess` for the flags, and translate
-each `prompts` entry back into a prompt file (`points` and `box` use the same SAM2 convention as the
-input prompt file). Given the same input store and weights, the run is deterministic.
+`prompts` back into a prompt file (`{"level": prompts.level, "objects": [...]}`; `points` and `box`
+use the same SAM2 convention as the input prompt file). Given the same input store and weights, the run is deterministic.

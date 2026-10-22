@@ -31,6 +31,7 @@ organ-masker-lite mask INPUT OUTPUT --prompts PROMPTS [options]
 | `--model-dir PATH` | no | `./organ_masker_models` (or env) | Weights directory (FR-019) |
 | `--no-download` | no | download on | Disable weight auto-download (FR-020) |
 | `--overwrite` | no | off | Allow overwriting existing OUTPUT (FR-013) |
+| `--workers INT` | no | automatic | Output shards written in parallel, ≥ 1 (feature 009; see `specs/009-scalable-mask-writer/contracts/cli.md`) |
 | `--verbose` | no | off | More logging |
 
 ### Prompt file format

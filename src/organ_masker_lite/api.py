@@ -13,6 +13,7 @@ Mirrors the structure of the SAM/SAM2 predictor so SAM users adopt it with minim
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -37,13 +38,30 @@ class MaskResult:
         self._reader = reader
         self._record = record
 
-    def save(self, store_path: str | Path, overwrite: bool = False) -> Path:
+    def save(
+        self,
+        store_path: str | Path,
+        overwrite: bool = False,
+        *,
+        workers: int | None = None,
+        progress: Callable[[str], None] | None = None,
+    ) -> Path:
         """Write OME-Zarr v0.5 with the same levels as the input, embedding the run record.
 
-        Refuses to overwrite an existing store unless ``overwrite=True`` (FR-013).
+        Refuses to overwrite an existing store unless ``overwrite=True`` (FR-013). Each level is
+        written one compressed shard at a time (feature 009). ``workers`` sets how many shards are
+        written in parallel (default: as many as fit in an 8 GiB budget); ``progress`` receives
+        per-level messages, including the worker count used.
         """
         return write_mask(
-            store_path, self.array, self._level, self._reader, self._record, overwrite=overwrite
+            store_path,
+            self.array,
+            self._level,
+            self._reader,
+            self._record,
+            overwrite=overwrite,
+            workers=workers,
+            progress=progress,
         )
 
 

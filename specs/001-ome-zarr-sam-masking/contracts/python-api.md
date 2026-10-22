@@ -47,9 +47,11 @@ mask.save("output.ome.zarr")
 
 ### `MaskResult`
 - `.array` — the consensus mask at the run level (NumPy/lazy).
-- `.save(store_path, overwrite=False)` — writes OME-Zarr v0.5 with the **same levels as the input**
-  (research R5), refusing to overwrite unless `overwrite=True` (FR-013), and embedding the run
-  record (FR-014).
+- `.save(store_path, overwrite=False, *, workers=None, progress=None)` — writes OME-Zarr v0.5 with
+  the **same levels as the input** (research R5), refusing to overwrite unless `overwrite=True`
+  (FR-013), and embedding the run record (FR-014). Since feature 009 each level is written shard by
+  shard (sharded, compressed); `workers`/`progress` are described in
+  `specs/009-scalable-mask-writer/contracts/python-api.md`.
 
 ## Behavioral contract (testable)
 

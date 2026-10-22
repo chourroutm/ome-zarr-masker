@@ -232,3 +232,39 @@ def test_overwrite_flag_allows_replacement(valid_input, tmp_path):
     )
     assert code == 0
     assert OmeZarrReader(out).n_levels == OmeZarrReader(valid_input).n_levels
+
+
+# -- feature 009: --workers (FR-011, C-W-CLI-2/3) -----------------------------------------------
+
+
+def test_workers_zero_is_usage_error_and_writes_nothing(valid_input, tmp_path, capsys):
+    out = tmp_path / "out.ome.zarr"
+    argv = ["mask", str(valid_input), str(out), "--prompts", str(_single_point_prompts(tmp_path))]
+    with pytest.raises(SystemExit) as exc:
+        main([*argv, "--workers", "0"])
+    assert exc.value.code == 2
+    assert "--workers" in capsys.readouterr().err
+    assert not out.exists()
+
+
+@pytest.mark.real_backend
+@requires_sam2
+def test_workers_does_not_change_output(valid_input, tmp_path):
+    import json
+
+    prompts = _single_point_prompts(tmp_path)
+    outs = []
+    for name, extra in (("auto", []), ("two", ["--workers", "2"])):
+        out = tmp_path / f"{name}.ome.zarr"
+        code = main(
+            ["mask", str(valid_input), str(out), "--prompts", str(prompts), "--level", "0", *extra]
+        )
+        assert code == 0
+        outs.append(out)
+    a, b = (OmeZarrReader(o) for o in outs)
+    for i in range(a.n_levels):
+        assert np.array_equal(a.read_level(i), b.read_level(i))
+    ra, rb = (json.loads((o / "run_record.json").read_text()) for o in outs)
+    ra.pop("run_id")
+    rb.pop("run_id")
+    assert ra == rb

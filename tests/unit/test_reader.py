@@ -75,3 +75,15 @@ def test_bad_path_raises(tmp_path):
     with pytest.raises(ReaderError):
         OmeZarrReader(tmp_path / "does-not-exist.ome.zarr")
 
+
+def test_level_storage_reports_chunks_and_shards(tmp_path):
+    vol = np.zeros((40, 70, 70), np.uint8)
+    sharded = OmeZarrReader(
+        write_ome_zarr(
+            tmp_path / "s.ome.zarr", vol, n_levels=2, chunks=(16, 16, 16), shards=(32, 32, 32)
+        )
+    )
+    assert sharded.level_storage(0) == ((16, 16, 16), (32, 32, 32))
+    plain = OmeZarrReader(write_ome_zarr(tmp_path / "p.ome.zarr", vol, n_levels=2))
+    chunks, shards = plain.level_storage(1)
+    assert chunks == (20, 35, 35) and shards is None

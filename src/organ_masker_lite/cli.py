@@ -82,6 +82,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Swap the output mask's values: background becomes 1, organ becomes 0 (default: off)",
     )
     mask.add_argument("--overwrite", action="store_true", help="Overwrite an existing output")
+    mask.add_argument(
+        "--workers",
+        type=_positive_int,
+        default=None,
+        help=(
+            "Output shards written in parallel (default: as many as fit in an 8 GiB write "
+            "budget, at most the CPU count). Peak write memory grows with this number."
+        ),
+    )
     mask.add_argument("--verbose", action="store_true", help="Print progress to stderr")
     _add_log_options(mask)
     mask.set_defaults(func=_cmd_mask)
@@ -102,6 +111,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     interactive.set_defaults(func=_cmd_interactive)
     return parser
+
+
+def _positive_int(value: str) -> int:
+    try:
+        n = int(value)
+    except ValueError:
+        n = 0
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be an integer >= 1, got {value!r}")
+    return n
 
 
 def _loggable_args(args: argparse.Namespace) -> dict:
@@ -154,7 +173,14 @@ def _cmd_mask(args: argparse.Namespace) -> int:
 
         try:
             out = run_masking(
-                args.input, args.output, prompts, config, progress=progress, run_id=log.run_id
+                args.input,
+                args.output,
+                prompts,
+                config,
+                progress=progress,
+                run_id=log.run_id,
+                workers=args.workers,
+                on_level=log.record_write_level,
             )
         except (ValidationError, ReaderError, WriterError, PromptError, PipelineError) as exc:
             log.mark_failed(str(exc))

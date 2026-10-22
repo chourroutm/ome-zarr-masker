@@ -73,6 +73,15 @@ class InvocationLog:
         self._emit("effective_config:")
         _emit_mapping(self._emit, effective_config, indent="  ")
 
+    def record_write_level(self, layout, n_shards: int, workers: int, workers_source: str) -> None:
+        """Append how one output level is written (feature 009, FR-012): layout and worker count."""
+        self._emit(
+            f"write_level: {layout.level} shape={tuple(layout.shape)} "
+            f"chunks={tuple(layout.chunks)} "
+            f"shards={tuple(layout.shards)} shards_total={n_shards} "
+            f"workers={workers} ({workers_source}) source={layout.source}"
+        )
+
     def record_prompts(self, prompts: PromptSet, source: str) -> None:
         """Append the full prompt set with its source, authoring level, and count (FR-003, FR-010;
         the authoring level is feature 008-level-agnostic-prompts, FR-002).

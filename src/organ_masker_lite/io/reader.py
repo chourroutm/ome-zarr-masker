@@ -73,6 +73,11 @@ class OmeZarrReader:
     def level_shape(self, level: int) -> tuple[int, ...]:
         return self.levels[level].shape
 
+    def level_storage(self, level: int) -> tuple[tuple[int, ...], tuple[int, ...] | None]:
+        """The level array's ``(chunks, shards)``; ``shards`` is ``None`` when it isn't sharded."""
+        arr = self._open_array(self._datasets[level].path)
+        return tuple(arr.chunks), (tuple(arr.shards) if arr.shards is not None else None)
+
     def level_transform(self, level: int) -> tuple[tuple[float, ...], tuple[float, ...]]:
         """The level's ``(scale, translation)`` per axis; 1 and 0 where the metadata omits them."""
         ndim = len(self.axes)

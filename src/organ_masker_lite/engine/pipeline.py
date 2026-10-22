@@ -250,12 +250,15 @@ def run_masking(
     backend: Sam2Backend | None = None,
     progress: Callable[[str], None] | None = None,
     run_id: str | None = None,
+    workers: int | None = None,
+    on_level=None,
 ) -> Path:
     """Run an end-to-end masking pipeline and write an OME-Zarr v0.5 mask.
 
     ``reader``/``backend`` may be injected; otherwise they are constructed from ``input_path``/
     ``config``. Segmentation always uses SAM2. ``run_id`` is embedded in the run record for log
-    correlation.
+    correlation. ``workers``/``on_level`` are passed to the writer (feature 009): shards written in
+    parallel, and a per-level callback (used by the CLI's input log).
     """
     comp = compute_mask(
         input_path,
@@ -275,6 +278,9 @@ def run_masking(
         comp.reader,
         comp.record,
         overwrite=config.overwrite,
+        workers=workers,
+        progress=progress,
+        on_level=on_level,
     )
     return Path(output_path)
 
