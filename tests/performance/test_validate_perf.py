@@ -13,7 +13,7 @@ import time
 
 import numpy as np
 
-from organ_masker_lite.io.validate import validate_ome_zarr
+from ome_zarr_masker.io.validate import validate_ome_zarr
 
 from ..conftest import write_ome_zarr
 

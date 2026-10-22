@@ -68,7 +68,7 @@ identity for the run level itself.
 shape-ratio centre mapping (the workaround; wrong for translation-free inputs, and ignores
 translations that aren't exactly half a voxel).
 
-**Shared implementation**: the formula already exists as `src/organ_masker_lite/geometry.py::
+**Shared implementation**: the formula already exists as `src/ome_zarr_masker/geometry.py::
 nearest_index` (added when feature 008's prompt conversion was reworked onto the same rule), and
 each level's `(scale, translation)` comes from `OmeZarrReader.level_transform(level)` (translation 0
 when absent). The writer maps target indices `arange(dst_dim)` from the target level to the run level

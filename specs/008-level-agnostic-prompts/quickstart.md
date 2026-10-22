@@ -14,8 +14,8 @@ frame `z=2`):
 ```
 
 ```sh
-organ-masker-lite mask input.ome.zarr out_level0.ome.zarr --prompts p.json --level 0
-organ-masker-lite mask input.ome.zarr out_level1.ome.zarr --prompts p.json --level 1
+ome-zarr-masker mask input.ome.zarr out_level0.ome.zarr --prompts p.json --level 0
+ome-zarr-masker mask input.ome.zarr out_level1.ome.zarr --prompts p.json --level 1
 ```
 
 Expected: both succeed and both masks have non-empty foreground around the blob at their respective
@@ -27,8 +27,8 @@ should agree. Validates C-PF-1.
 ## 2. Same-level reruns are unchanged (FR-006, SC-002)
 
 ```sh
-organ-masker-lite mask input.ome.zarr out_a.ome.zarr --prompts p.json --level 0
-organ-masker-lite mask input.ome.zarr out_b.ome.zarr --prompts p.json --level 0
+ome-zarr-masker mask input.ome.zarr out_a.ome.zarr --prompts p.json --level 0
+ome-zarr-masker mask input.ome.zarr out_b.ome.zarr --prompts p.json --level 0
 ```
 
 Expected: `out_a` and `out_b` are byte-identical (modulo the run-record's `run_id`), matching
@@ -38,11 +38,11 @@ pre-feature behavior exactly. Validates C-PF-2.
 
 ```sh
 echo '{"objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}]}]}' > old.json
-organ-masker-lite mask input.ome.zarr out.ome.zarr --prompts old.json --level 0
+ome-zarr-masker mask input.ome.zarr out.ome.zarr --prompts old.json --level 0
 echo $?   # expect 1, out.ome.zarr not created
 
 echo '{"level": 99, "objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}]}]}' > badlevel.json
-organ-masker-lite mask input.ome.zarr out.ome.zarr --prompts badlevel.json --level 0
+ome-zarr-masker mask input.ome.zarr out.ome.zarr --prompts badlevel.json --level 0
 echo $?   # expect 1, error names available levels, out.ome.zarr not created
 ```
 
@@ -52,9 +52,9 @@ Expected: both exit non-zero with an actionable message, and neither leaves a pa
 ## 4. Anisotropic pyramid: each axis converts by its own scale (Acceptance Scenario 3, FR-004)
 
 ```python
-from organ_masker_lite.config import RunConfig
-from organ_masker_lite.engine.pipeline import compute_mask
-from organ_masker_lite.prompts.model import Prompt, PromptSet
+from ome_zarr_masker.config import RunConfig
+from ome_zarr_masker.engine.pipeline import compute_mask
+from ome_zarr_masker.prompts.model import Prompt, PromptSet
 from tests.conftest import write_ome_zarr
 import numpy as np
 

@@ -183,7 +183,7 @@ def compute_mask(
         except Exception as exc:  # noqa: BLE001
             raise PipelineError(str(exc)) from exc
 
-    with tempfile.TemporaryDirectory(prefix="organ_masker_") as workdir:
+    with tempfile.TemporaryDirectory(prefix="ome_zarr_masker_") as workdir:
         preflight_disk(estimate_intermediate_bytes(working_shape), workdir)
         accumulator = VoteAccumulator(working_shape, workdir)
 

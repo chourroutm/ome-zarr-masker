@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from organ_masker_lite.geometry import nearest_index
+from ome_zarr_masker.geometry import nearest_index
 
 
 def test_identity_when_transforms_match():

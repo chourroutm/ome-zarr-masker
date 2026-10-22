@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from organ_masker_lite.cli import main
+from ome_zarr_masker.cli import main
 
 from ..conftest import sam2_available
 
@@ -50,7 +50,7 @@ def test_successful_cli_run_writes_log(single_blob_zarr, tmp_path):
     logs = list(logdir.glob("*.log"))
     assert len(logs) == 1
     text = logs[0].read_text()
-    assert "command: organ-masker-lite mask" in text
+    assert "command: ome-zarr-masker mask" in text
     assert "effective_config:" in text
     assert "backend: sam2" in text
     assert "outcome: succeeded" in text
@@ -63,7 +63,7 @@ def test_log_records_one_write_level_line_per_level(single_blob_zarr, tmp_path, 
     """Feature 009 (FR-012, C-W-CLI-5): the effective worker count per output level."""
     import re
 
-    from organ_masker_lite.io.reader import OmeZarrReader
+    from ome_zarr_masker.io.reader import OmeZarrReader
 
     store, (cx, cy), frame = single_blob_zarr
     prompts = tmp_path / "p.json"

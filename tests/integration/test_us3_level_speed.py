@@ -14,10 +14,10 @@ import time
 import numpy as np
 import pytest
 
-from organ_masker_lite.config import RunConfig
-from organ_masker_lite.engine.pipeline import run_masking
-from organ_masker_lite.prompts.model import Prompt, PromptSet
-from organ_masker_lite.sam2 import Sam2Backend
+from ome_zarr_masker.config import RunConfig
+from ome_zarr_masker.engine.pipeline import run_masking
+from ome_zarr_masker.prompts.model import Prompt, PromptSet
+from ome_zarr_masker.sam2 import Sam2Backend
 
 from ..conftest import sam2_available, write_ome_zarr
 

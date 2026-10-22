@@ -8,8 +8,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_MODEL_DIR = "organ_masker_models"
-MODEL_DIR_ENV = "ORGAN_MASKER_MODEL_DIR"
+DEFAULT_MODEL_DIR = "ome_zarr_masker_models"
+MODEL_DIR_ENV = "OME_ZARR_MASKER_MODEL_DIR"
 
 #: A weight fetcher: download the file at ``url`` to the local path ``dest``. Injectable so the
 #: resolution logic can be tested without touching the network (see ``RunConfig.resolve_weight``).
@@ -23,8 +23,8 @@ def default_weight_downloader(url: str, dest: Path) -> None:
     tmp.replace(dest)
 
 
-DEFAULT_LOG_DIR = "organ_masker_logs"
-LOG_DIR_ENV = "ORGAN_MASKER_LOG_DIR"
+DEFAULT_LOG_DIR = "ome_zarr_masker_logs"
+LOG_DIR_ENV = "OME_ZARR_MASKER_LOG_DIR"
 
 #: Sentinel meaning "use the coarsest level (highest index)".
 COARSEST_LEVEL = -1

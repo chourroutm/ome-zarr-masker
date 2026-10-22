@@ -30,7 +30,7 @@ shares `interactive.py` and the export-safety fix.
 
 ## Path Conventions
 
-Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/`.
+Single Python package, `src/` layout: `src/ome_zarr_masker/`, tests in `tests/`.
 
 ---
 
@@ -81,19 +81,19 @@ that both fast-tier modes will reuse for FR-011.
 ### Implementation
 
 - [X] T008 Add `frame_range: tuple[int, int] | None = None` to `RunConfig` with bounds validation
-      in `__post_init__` (`0 <= start <= end`) in `src/organ_masker_lite/config.py` (depends on
+      in `__post_init__` (`0 <= start <= end`) in `src/ome_zarr_masker/config.py` (depends on
       T003 failing first) (data-model.md)
 - [X] T009 Implement the pure `_crop_to_frame_range`/`_place_at_offset` helpers and wire
       `compute_mask` to use them when `config.frame_range` is set — crop the prompted-axis volume
       and remap prompts before calling the existing, unmodified `run_sweep`, then place its result
-      back into a full-volume-shaped array — in `src/organ_masker_lite/engine/pipeline.py`
+      back into a full-volume-shaped array — in `src/ome_zarr_masker/engine/pipeline.py`
       (depends on T001, T002 failing first; depends on T008) (research R3)
 - [X] T010 Change `InteractiveSession.export()` to always call `self.preview(frame_range=None)`
       fresh rather than reusing any cached `self._preview`, so a prior partial preview can never be
-      silently exported — in `src/organ_masker_lite/interactive.py` (depends on T005 failing
+      silently exported — in `src/ome_zarr_masker/interactive.py` (depends on T005 failing
       first; depends on T009) (FR-008, C-PV-9)
 - [X] T011 Implement the pure `_PreviewBusyGuard` class (`try_start() -> bool`, `finish() -> None`)
-      in `src/organ_masker_lite/interactive.py` (depends on T007 failing first) (research R4,
+      in `src/ome_zarr_masker/interactive.py` (depends on T007 failing first) (research R4,
       FR-011)
 
 **Checkpoint**: `frame_range` is fully supported, tested, and benchmarked end-to-end; unset
@@ -115,18 +115,18 @@ single-slice preview, and confirm a result appears within seconds without freezi
 - [X] T012 [US1] Add the single-slice shortcut in `launch()`: `@thread_worker`-decorated
       computation calling `self.preview(frame_range=(current, current))` (`current` from
       `viewer.dims.current_step` on the swept axis) on a background thread, guarded by
-      `_PreviewBusyGuard` (T011) per FR-011 — in `src/organ_masker_lite/interactive.py` (depends
+      `_PreviewBusyGuard` (T011) per FR-011 — in `src/ome_zarr_masker/interactive.py` (depends
       on T009, T010, T011) (FR-003, FR-010, FR-011, C-PV-2/5/6)
 - [X] T013 [US1] Show a busy indicator (`viewer.status` text) for the async computation's
       duration, driven by the guard's state, cleared on completion or error — in
-      `src/organ_masker_lite/interactive.py` (depends on T012) (FR-010)
+      `src/ome_zarr_masker/interactive.py` (depends on T012) (FR-010)
 - [X] T014 [US1] Merge the single-slice result into the shared "preview" layer at only that one
       frame index (create it zero-filled at the full volume shape first if it doesn't exist yet),
       leaving every other frame's existing content unchanged — in
-      `src/organ_masker_lite/interactive.py` (depends on T012) (research R3, C-PV-11)
+      `src/ome_zarr_masker/interactive.py` (depends on T012) (research R3, C-PV-11)
 - [X] T015 [US1] Show a clear, actionable message when single-slice is triggered with no prompts on
       the current frame, mirroring the existing "at least one positive point or box required"
-      validation — in `src/organ_masker_lite/interactive.py` (depends on T012) (Acceptance
+      validation — in `src/ome_zarr_masker/interactive.py` (depends on T012) (Acceptance
       Scenario 3)
 
 **Checkpoint**: Single-slice mode fully functional and independently shippable — validate manually
@@ -148,13 +148,13 @@ reflects propagation across the bounded window, clipped correctly near a volume 
       1]` near either boundary — in `tests/unit/test_interactive_preview_state.py` (same file as
       T007) (research R4, FR-004)
 - [X] T017 [US2] Implement the pure `_clip_window` helper in
-      `src/organ_masker_lite/interactive.py` (depends on T016 failing first) (research R4)
+      `src/ome_zarr_masker/interactive.py` (depends on T016 failing first) (research R4)
 - [X] T018 [US2] Add the few-slices shortcut in `launch()`, reusing T012's async/`_PreviewBusyGuard`
       pattern: computes `self.preview(frame_range=_clip_window(current, 5, n_frames))` — in
-      `src/organ_masker_lite/interactive.py` (depends on T012, T009, T017) (FR-004, FR-009,
+      `src/ome_zarr_masker/interactive.py` (depends on T012, T009, T017) (FR-004, FR-009,
       FR-010, FR-011, C-PV-3/5/6)
 - [X] T019 [US2] Merge the few-slices result into the shared preview layer at only the window's
-      frame indices, reusing T014's merge logic — in `src/organ_masker_lite/interactive.py`
+      frame indices, reusing T014's merge logic — in `src/ome_zarr_masker/interactive.py`
       (depends on T014, T018) (research R3, C-PV-11)
 
 **Checkpoint**: Few-slices mode functional — validate manually via `quickstart.md` Step 2's
@@ -174,10 +174,10 @@ any computation starts; declining leaves the current preview and session state u
 - [X] T020 [US3] Add the whole-volume shortcut in `launch()`: show a
       `qtpy.QtWidgets.QMessageBox.question(...)` confirmation naming the cost/time implication
       before computing; declining runs no computation and leaves state unchanged — in
-      `src/organ_masker_lite/interactive.py` (depends on T009) (FR-005, FR-006, C-PV-4/8)
+      `src/ome_zarr_masker/interactive.py` (depends on T009) (FR-005, FR-006, C-PV-4/8)
 - [X] T021 [US3] On confirmation, run the existing whole-volume computation synchronously
       (`frame_range=None`, today's exact `p` behavior) and replace the entire shared preview
-      layer's data — in `src/organ_masker_lite/interactive.py` (depends on T020) (FR-005,
+      layer's data — in `src/ome_zarr_masker/interactive.py` (depends on T020) (FR-005,
       C-PV-11's whole-volume replace clause)
 
 **Checkpoint**: Whole-volume mode functional with its confirmation gate — validate manually via

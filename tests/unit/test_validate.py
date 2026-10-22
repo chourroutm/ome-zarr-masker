@@ -16,7 +16,7 @@ import sys
 import numpy as np
 import pytest
 
-from organ_masker_lite.io.validate import ValidationError, validate_ome_zarr
+from ome_zarr_masker.io.validate import ValidationError, validate_ome_zarr
 
 from ..conftest import write_ome_zarr
 

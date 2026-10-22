@@ -14,12 +14,12 @@ import json
 import numpy as np
 import pytest
 
-from organ_masker_lite.config import RunConfig
-from organ_masker_lite.engine.pipeline import compute_mask
-from organ_masker_lite.interactive import InteractiveSession
-from organ_masker_lite.io.reader import OmeZarrReader
-from organ_masker_lite.io.validate import validate_ome_zarr
-from organ_masker_lite.prompts.model import load_prompt_file
+from ome_zarr_masker.config import RunConfig
+from ome_zarr_masker.engine.pipeline import compute_mask
+from ome_zarr_masker.interactive import InteractiveSession
+from ome_zarr_masker.io.reader import OmeZarrReader
+from ome_zarr_masker.io.validate import validate_ome_zarr
+from ome_zarr_masker.prompts.model import load_prompt_file
 
 from ..conftest import sam2_available
 

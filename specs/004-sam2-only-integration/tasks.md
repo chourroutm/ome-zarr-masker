@@ -21,7 +21,7 @@ description: "Task list template for feature implementation"
 
 ## Path Conventions
 
-Single project: `src/organ_masker_lite/`, `tests/` at repository root.
+Single project: `src/ome_zarr_masker/`, `tests/` at repository root.
 
 ---
 
@@ -43,23 +43,23 @@ rather than in a state where the parameter is gone but dependent test files aren
 
 ### Tests + conversion, together (write the new regression assertion first, then remove the old stub usage in the same file/task)
 
-- [X] T002 [P] In `tests/contract/test_cli_mask.py`: remove every `--backend` argument from existing CLI invocations; add a new test asserting `organ-masker-lite mask ... --backend anything` fails via `argparse`'s "unrecognized arguments" error (non-zero exit); mark masking-invocation tests `@pytest.mark.real_backend`
+- [X] T002 [P] In `tests/contract/test_cli_mask.py`: remove every `--backend` argument from existing CLI invocations; add a new test asserting `ome-zarr-masker mask ... --backend anything` fails via `argparse`'s "unrecognized arguments" error (non-zero exit); mark masking-invocation tests `@pytest.mark.real_backend`
 - [X] T003 [P] In `tests/contract/test_python_api.py`: remove every `backend=` argument from existing calls; delete `test_c_api_7_sam3_backend_runs_same_flow` and its `_HAVE_SAM3`/`real_backend_available("sam3")` gate; add a new test asserting `OrganMaskPredictor(backend="sam3")` raises `TypeError` naming the unexpected `backend` keyword; mark masking tests `@pytest.mark.real_backend`
 
 ### Source implementation
 
-- [X] T004 [P] Move `src/organ_masker_lite/backends/sam2.py` to `src/organ_masker_lite/sam2.py` (drop the `name = "sam2"` class attribute; change the `RunConfig(backend="sam2")` fallback in `__init__` to `RunConfig()`); delete the rest of `src/organ_masker_lite/backends/` (`__init__.py`, `base.py`, `registry.py`, `sam3.py`)
-- [X] T005 [P] In `src/organ_masker_lite/engine/pipeline.py`: replace `from ..backends.base import VideoSegmenterBackend` / `from ..backends.registry import get_backend` with `from ..sam2 import Sam2Backend`; remove the `backend: VideoSegmenterBackend | None = None` parameter from `compute_mask` and `run_masking`; construct `Sam2Backend(config=config)` unconditionally, still wrapped in `try/except Exception as exc: raise PipelineError(str(exc)) from exc` (depends on T004)
-- [X] T006 [P] In `src/organ_masker_lite/engine/sweep.py`: replace `from ..backends.base import VideoSegmenterBackend` with `from ..sam2 import Sam2Backend`; retype `run_sweep`'s `backend` parameter as `Sam2Backend` (depends on T004)
-- [X] T007 [P] In `src/organ_masker_lite/config.py`: remove the `backend: str = "sam2"` field from `RunConfig`; change `to_record()` to emit a hardcoded `"backend": "sam2"` instead of `self.backend`
-- [X] T008 [P] In `src/organ_masker_lite/cli.py`: remove the `--backend` argument from both the `mask` and `interactive` subparsers; remove `backend=args.backend` from the `RunConfig(...)` and `InteractiveSession(...)` construction calls
-- [X] T009 [P] In `src/organ_masker_lite/api.py`: remove the `backend: str = "sam2"` parameter and `self._backend` from `OrganMaskPredictor.__init__`; remove the `"backend": self._backend` entry from the kwargs dict built in `predict()`
-- [X] T010 [P] In `src/organ_masker_lite/interactive.py`: remove the `backend: str = "sam2"` parameter from `InteractiveSession.__init__` and from the call it forwards
+- [X] T004 [P] Move `src/ome_zarr_masker/backends/sam2.py` to `src/ome_zarr_masker/sam2.py` (drop the `name = "sam2"` class attribute; change the `RunConfig(backend="sam2")` fallback in `__init__` to `RunConfig()`); delete the rest of `src/ome_zarr_masker/backends/` (`__init__.py`, `base.py`, `registry.py`, `sam3.py`)
+- [X] T005 [P] In `src/ome_zarr_masker/engine/pipeline.py`: replace `from ..backends.base import VideoSegmenterBackend` / `from ..backends.registry import get_backend` with `from ..sam2 import Sam2Backend`; remove the `backend: VideoSegmenterBackend | None = None` parameter from `compute_mask` and `run_masking`; construct `Sam2Backend(config=config)` unconditionally, still wrapped in `try/except Exception as exc: raise PipelineError(str(exc)) from exc` (depends on T004)
+- [X] T006 [P] In `src/ome_zarr_masker/engine/sweep.py`: replace `from ..backends.base import VideoSegmenterBackend` with `from ..sam2 import Sam2Backend`; retype `run_sweep`'s `backend` parameter as `Sam2Backend` (depends on T004)
+- [X] T007 [P] In `src/ome_zarr_masker/config.py`: remove the `backend: str = "sam2"` field from `RunConfig`; change `to_record()` to emit a hardcoded `"backend": "sam2"` instead of `self.backend`
+- [X] T008 [P] In `src/ome_zarr_masker/cli.py`: remove the `--backend` argument from both the `mask` and `interactive` subparsers; remove `backend=args.backend` from the `RunConfig(...)` and `InteractiveSession(...)` construction calls
+- [X] T009 [P] In `src/ome_zarr_masker/api.py`: remove the `backend: str = "sam2"` parameter and `self._backend` from `OrganMaskPredictor.__init__`; remove the `"backend": self._backend` entry from the kwargs dict built in `predict()`
+- [X] T010 [P] In `src/ome_zarr_masker/interactive.py`: remove the `backend: str = "sam2"` parameter from `InteractiveSession.__init__` and from the call it forwards
 - [X] T011 [P] Remove the `sam3 = ["torch", "sam3"]` line from `[project.optional-dependencies]` in `pyproject.toml`
 
 ### Remaining test-suite conversion (depends on T004-T011 landing; these files call the now-changed signatures)
 
-- [X] T012 In `tests/conftest.py`: delete `StubBackend`, `StubBackendDilate`, the `stub_backend` fixture, the `register_backend` import and both `register_backend(...)` calls; replace `real_backend_available(name: str)` with a no-argument `sam2_available() -> bool` that tries constructing `Sam2Backend()` (from `organ_masker_lite.sam2`) and returns `False` on `ImportError`
+- [X] T012 In `tests/conftest.py`: delete `StubBackend`, `StubBackendDilate`, the `stub_backend` fixture, the `register_backend` import and both `register_backend(...)` calls; replace `real_backend_available(name: str)` with a no-argument `sam2_available() -> bool` that tries constructing `Sam2Backend()` (from `ome_zarr_masker.sam2`) and returns `False` on `ImportError`
 - [X] T013 [P] In `tests/unit/test_config.py`: drop the `backend="sam2"` keyword from the `RunConfig(...)` constructor call (field removed; the `rec["backend"] == "sam2"` assertion is unaffected) (depends on T007)
 - [X] T014 [P] In `tests/integration/test_api_cli_parity.py`: remove `--backend`/`backend=` usage; mark `@pytest.mark.real_backend`, skip-guarded via `sam2_available()` (depends on T012)
 - [X] T015 [P] In `tests/integration/test_engine_smoke.py`: remove the `stub_backend` fixture parameter and `backend=stub_backend`/`backend="stub"` usage; mark `@pytest.mark.real_backend`, skip-guarded (depends on T012)
@@ -113,12 +113,12 @@ unconditional SAM2; any old backend usage fails clearly (T002, T003 passing).
 count actually went down.
 
 **Independent Test**: `grep -rn "VideoSegmenterBackend\|register_backend\|get_backend\|BackendError\|backends\."
-src/ tests/` returns nothing; `src/organ_masker_lite/` has fewer files than before this feature.
+src/ tests/` returns nothing; `src/ome_zarr_masker/` has fewer files than before this feature.
 
 ### Implementation for User Story 2
 
 - [X] T037 [US2] Run `grep -rn "VideoSegmenterBackend\|register_backend\|get_backend\|BackendError\|backends\." src/ tests/` and confirm zero matches (depends on T004-T012, T034, T035)
-- [X] T038 [US2] Count files under `src/organ_masker_lite/` (e.g. `find src/organ_masker_lite -type f -name '*.py' | wc -l`) before vs. after this feature (via `git diff --stat` against the branch point) and confirm the count decreased by 4 (SC-003) (depends on T004)
+- [X] T038 [US2] Count files under `src/ome_zarr_masker/` (e.g. `find src/ome_zarr_masker -type f -name '*.py' | wc -l`) before vs. after this feature (via `git diff --stat` against the branch point) and confirm the count decreased by 4 (SC-003) (depends on T004)
 
 **Checkpoint**: Zero backend-abstraction references anywhere. File count down as expected.
 
@@ -133,7 +133,7 @@ nothing.
 
 ### Implementation for User Story 3
 
-- [X] T039 [US3] Remove the "### SAM3 backend" section from `README.md` (gated-weights paragraph, tokenizer-vocab paragraph, and the env var table rows for `HF_TOKEN`, `ORGAN_MASKER_SAM3_CHECKPOINT`, `ORGAN_MASKER_SAM3_BPE`, `ORGAN_MASKER_SAM3_BPE_URL`)
+- [X] T039 [US3] Remove the "### SAM3 backend" section from `README.md` (gated-weights paragraph, tokenizer-vocab paragraph, and the env var table rows for `HF_TOKEN`, `OME_ZARR_MASKER_SAM3_CHECKPOINT`, `OME_ZARR_MASKER_SAM3_BPE`, `OME_ZARR_MASKER_SAM3_BPE_URL`)
 - [X] T040 [US3] In `README.md`: remove the `pip install -e ".[sam3]"` line, every remaining `--backend` mention (not narrowed — the flag is gone), the "SAM2 (default) and SAM3 as first-class, interchangeable backends" line, and the "SAM2/SAM3" phrasing in the feature summary and the real-backend test note (depends on T039 — same file)
 
 **Checkpoint**: All three user stories independently functional. README documents one unconditional SAM2 workflow.
@@ -240,7 +240,7 @@ T002-T035 and T037-T040 are implemented (all file edits complete; verified with 
 py_compile` across `src/` and `tests/` — no syntax errors — and manual review of every changed
 call site). T037's grep and T038's file count were run directly and confirmed: zero
 `VideoSegmenterBackend`/`register_backend`/`get_backend`/`BackendError`/`backends.` references
-anywhere, and `src/organ_masker_lite/` file count went from 25 to 21 (−4, matching SC-003 exactly).
+anywhere, and `src/ome_zarr_masker/` file count went from 25 to 21 (−4, matching SC-003 exactly).
 
 **Left unchecked, blocked on environment access this session does not have** (no Python
 environment with the project's dependencies, and no GPU/SAM2 weights, are available here):

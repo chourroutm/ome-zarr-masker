@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import zarr
 
-from organ_masker_lite.io.reader import OmeZarrReader
+from ome_zarr_masker.io.reader import OmeZarrReader
 
 from ..conftest import write_ome_zarr
 from ..unit.test_writer import _reference_nn_resize
@@ -45,7 +45,7 @@ def test_write_memory_is_bounded(tmp_path, monkeypatch):
     that level's size under a scaled-down budget (8 MiB, 64^3 shards)."""
     import tracemalloc
 
-    from organ_masker_lite.io import writer
+    from ome_zarr_masker.io import writer
 
     monkeypatch.setattr(writer, "WRITE_BUDGET_BYTES", 8 * 2**20)
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 64)
@@ -75,7 +75,7 @@ def test_write_time_within_legacy(tmp_path):
     import statistics
     import time
 
-    from organ_masker_lite.io.writer import write_mask
+    from ome_zarr_masker.io.writer import write_mask
 
     reader, mask = _reference_fixture(tmp_path)
     legacy, new = [], []

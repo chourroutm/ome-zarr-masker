@@ -19,7 +19,7 @@ testing of each story, after a Setup/Foundational base that every story depends 
 
 ## Path Conventions
 
-Single project: `src/organ_masker_lite/`, `tests/` at repository root (per plan.md).
+Single project: `src/ome_zarr_masker/`, `tests/` at repository root (per plan.md).
 
 ---
 
@@ -56,8 +56,8 @@ leaving any of them broken would violate the full-suite-green gate for every lat
   (not a bare list) with `objects` holding today's per-prompt dicts unchanged
 - [X] T004 Add `level: int | None = None` to the `PromptSet` dataclass and change
   `PromptSet.to_record()` to return `{"level": self.level, "objects": [existing per-prompt dicts]}`
-  in `src/organ_masker_lite/prompts/model.py` (makes T003 pass)
-- [X] T005 [P] Update `InvocationLog.record_prompts()` in `src/organ_masker_lite/input_log.py` to
+  in `src/ome_zarr_masker/prompts/model.py` (makes T003 pass)
+- [X] T005 [P] Update `InvocationLog.record_prompts()` in `src/ome_zarr_masker/input_log.py` to
   read `prompts.to_record()`'s new `{"level", "objects"}` shape (iterate `record["objects"]` instead
   of the old bare list) and emit one new `prompt_level: <value>` line; depends on T004
 - [X] T006 Write failing unit tests in `tests/unit/test_prompts.py` for
@@ -67,17 +67,17 @@ leaving any of them broken would violate the full-suite-green gate for every lat
   axis (`axis_index`) and the two in-plane axes scale by different, independent ratios; (d) nearest-
   pixel rounding (half-pixel cases round, don't truncate)
 - [X] T007 Implement `PromptSet.resolved_for_shape(src_shape, dst_shape, axis_index) -> PromptSet` in
-  `src/organ_masker_lite/prompts/model.py`: identity shortcut when shapes are equal; otherwise
+  `src/ome_zarr_masker/prompts/model.py`: identity shortcut when shapes are equal; otherwise
   per-axis ratio scaling of `frame_index` (sweep axis), and `point_coords`/`box` (the two remaining
   axes, in the same height/width order `PromptSet.validate()` already uses), rounded to the nearest
   pixel (makes T006 pass)
 - [X] T008 Write a failing unit test in `tests/unit/test_prompts.py`: `load_prompt_file()` raises
   `PromptError` with a clear message when the JSON has no top-level `"level"` key; parses `"level"`
   into `PromptSet.level` when present
-- [X] T009 Update `load_prompt_file()` in `src/organ_masker_lite/prompts/model.py` to require and
+- [X] T009 Update `load_prompt_file()` in `src/ome_zarr_masker/prompts/model.py` to require and
   parse the top-level `"level"` key (FR-007): raise `PromptError` when absent, otherwise set the
   returned `PromptSet.level` from it (makes T008 pass)
-- [X] T010 [P] In `src/organ_masker_lite/api.py`, change `predict()`'s
+- [X] T010 [P] In `src/ome_zarr_masker/api.py`, change `predict()`'s
   `prompt_set = PromptSet(list(self._prompts))` to
   `PromptSet(list(self._prompts), level=self._level)` so the API path stamps its current level the
   same way the file format now requires; depends on T004 (needed now, not deferred to a later story,
@@ -147,7 +147,7 @@ anatomical location as the coarse-level run (not a scaled-off location).
 
 ### Implementation for User Story 1
 
-- [X] T029 [US1] In `compute_mask` (`src/organ_masker_lite/engine/pipeline.py`), immediately after
+- [X] T029 [US1] In `compute_mask` (`src/ome_zarr_masker/engine/pipeline.py`), immediately after
   `level_shape = reader.level_shape(level)` and before `prompts.validate(level_shape,
   prompted_index)`, add: when `prompts.level` is not `None` and not equal to `level`, replace
   `prompts` with
@@ -209,7 +209,7 @@ input's pyramid, run the pipeline, and confirm a clear, actionable error is rais
 
 ### Implementation for User Story 3
 
-- [X] T033 [US3] In `compute_mask` (`src/organ_masker_lite/engine/pipeline.py`), immediately before
+- [X] T033 [US3] In `compute_mask` (`src/ome_zarr_masker/engine/pipeline.py`), immediately before
   the conversion call added in T029, add: when `prompts.level` is not `None` and not
   `0 <= prompts.level < reader.n_levels`, raise `PromptError` naming `prompts.level` and
   `reader.describe_levels()` (implements T032; depends on T029's insertion point existing)
@@ -260,11 +260,11 @@ use one rule.
   `tests/integration/test_us3_levels.py`: monkeypatch `OmeZarrReader.level_transform` to shift the run
   level's translation so a correctly authored point maps out of bounds, and assert exit 1 with no
   output (no SAM2 needed; the old version relied on a round-half-to-even artifact)
-- [X] T043 Add `src/organ_masker_lite/geometry.py::nearest_index` and
-  `src/organ_masker_lite/io/reader.py::OmeZarrReader.level_transform` (makes T039–T040 pass)
+- [X] T043 Add `src/ome_zarr_masker/geometry.py::nearest_index` and
+  `src/ome_zarr_masker/io/reader.py::OmeZarrReader.level_transform` (makes T039–T040 pass)
 - [X] T044 Replace `PromptSet.resolved_for_shape` with `PromptSet.resolved_between` in
-  `src/organ_masker_lite/prompts/model.py` (vectorised: one `nearest_index` call per axis across all
-  prompts; `Prompt.__new__` bypass kept) and call it from `src/organ_masker_lite/engine/pipeline.py`
+  `src/ome_zarr_masker/prompts/model.py` (vectorised: one `nearest_index` call per axis across all
+  prompts; `Prompt.__new__` bypass kept) and call it from `src/ome_zarr_masker/engine/pipeline.py`
   with `reader.level_transform(prompts.level)` / `reader.level_transform(level)` (makes T041–T042 pass)
 - [X] T045 Update this feature's spec (Clarifications, FR-004, Edge Cases, Assumptions), research (R8;
   R1/R3 marked superseded), data-model, contract (C-PF-5/6), plan and quickstart; full regression
@@ -292,7 +292,7 @@ use one rule.
 
 - Tests are written and confirmed failing before their corresponding implementation task.
 - Foundational tasks that touch the same file (`tests/unit/test_prompts.py`:
-  T003/T006/T008/T011; `src/organ_masker_lite/prompts/model.py`: T004/T007/T009) are sequential
+  T003/T006/T008/T011; `src/ome_zarr_masker/prompts/model.py`: T004/T007/T009) are sequential
   within that file, even where no logical dependency exists between the specific tests.
 
 ### Parallel Opportunities

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from organ_masker_lite.engine.pipeline import _crop_to_frame_range, _place_at_offset
-from organ_masker_lite.prompts.model import Prompt, PromptSet
+from ome_zarr_masker.engine.pipeline import _crop_to_frame_range, _place_at_offset
+from ome_zarr_masker.prompts.model import Prompt, PromptSet
 
 
 def _volume() -> np.ndarray:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from organ_masker_lite.engine.pipeline import (
+from ome_zarr_masker.engine.pipeline import (
     PipelineError,
     estimate_intermediate_bytes,
     preflight_disk,

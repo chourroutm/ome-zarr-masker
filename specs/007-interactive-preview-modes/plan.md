@@ -118,7 +118,7 @@ specs/007-interactive-preview-modes/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── config.py                  # changed: RunConfig gains `frame_range: tuple[int, int] | None =
 │                               #          None` (inclusive frame bounds on the prompted/swept axis)
 ├── engine/

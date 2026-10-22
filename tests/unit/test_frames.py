@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from organ_masker_lite.engine.frames import build_frame_stack, normalize_to_uint8
+from ome_zarr_masker.engine.frames import build_frame_stack, normalize_to_uint8
 
 
 def test_normalize_spans_full_uint8_range():

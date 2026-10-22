@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from organ_masker_lite.config import PostProcessConfig
-from organ_masker_lite.postprocess.morphology import postprocess_mask
+from ome_zarr_masker.config import PostProcessConfig
+from ome_zarr_masker.postprocess.morphology import postprocess_mask
 
 
 def _cuboid_mask() -> np.ndarray:

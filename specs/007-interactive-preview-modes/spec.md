@@ -6,9 +6,9 @@
 
 **Status**: Draft
 
-**Input**: User description: "there is a bug in organ-masker-lite where the preview does not
+**Input**: User description: "there is a bug in ome-zarr-masker where the preview does not
 display. check how it is made in micro_sam. note that objects are larger (ome-zarr) in real use
-cases for organ-masker-lite. the preview should have 3 modes, 3 shortcuts: single-slice, a few
+cases for ome-zarr-masker. the preview should have 3 modes, 3 shortcuts: single-slice, a few
 slices, whole volume (the latter needs to ask for confirmation)". Root-caused: today's single
 preview shortcut (`p`) always runs the same full-volume, whole-axis propagation as a final export,
 synchronously — fast enough to look fine on small test volumes, but on a real large OME-Zarr

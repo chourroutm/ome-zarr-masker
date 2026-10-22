@@ -27,7 +27,7 @@ silently reinterpreted.
 already exposes; it reads no new OME-Zarr metadata (no new reliance on `coordinateTransformations`).
 
 **Storage**: OME-Zarr v0.5 stores on the local filesystem (unchanged, local-only -- remote sources
-remain explicitly out of scope). The prompt-file JSON format (an `organ-masker-lite`-specific
+remain explicitly out of scope). The prompt-file JSON format (an `ome-zarr-masker`-specific
 contract, not an OME-Zarr artifact) gains one required field.
 
 **Testing**: pytest. `tests/unit/test_prompts.py` gains conversion/round-trip/rejection cases;
@@ -39,7 +39,7 @@ Structure) must add the new `"level"` key to keep passing under FR-007.
 
 **Target Platform**: Linux/macOS CLI and Python library (unchanged).
 
-**Project Type**: Single project (library + CLI), existing layout under `src/organ_masker_lite/`.
+**Project Type**: Single project (library + CLI), existing layout under `src/ome_zarr_masker/`.
 
 **Performance Goals**: Conversion is `O(n_prompts)` scalar arithmetic with no I/O -- adds no
 measurable latency versus today (budget: < 4 ms for a prompt set of up to 500 prompts, a generous
@@ -56,11 +56,11 @@ pre-feature prompt files is in scope. Same-level reruns MUST stay byte-identical
 (FR-006, SC-002) -- the conversion step MUST be a true no-op (identity, not a 1.0-ratio recomputation)
 when the authoring level equals the run level or is unset.
 
-**Scale/Scope**: Confined to `src/organ_masker_lite/prompts/model.py` (new `PromptSet.level` field +
-a shape-ratio conversion method), `src/organ_masker_lite/engine/pipeline.py` (one conversion call
+**Scale/Scope**: Confined to `src/ome_zarr_masker/prompts/model.py` (new `PromptSet.level` field +
+a shape-ratio conversion method), `src/ome_zarr_masker/engine/pipeline.py` (one conversion call
 ahead of the existing `prompts.validate(...)`, plus the existing-level-exists check), `src/
-organ_masker_lite/api.py` (stamp the predictor's current level when `predict()` builds the
-`PromptSet`, one line), `src/organ_masker_lite/input_log.py` (`record_prompts` logs the new level
+ome_zarr_masker/api.py` (stamp the predictor's current level when `predict()` builds the
+`PromptSet`, one line), `src/ome_zarr_masker/input_log.py` (`record_prompts` logs the new level
 trace), its unit/integration tests, and docs (`README.md`'s prompt-file example,
 `specs/001-ome-zarr-sam-masking/data-model.md`'s `Prompt`/`PromptSet` entity tables, and
 `specs/001-ome-zarr-sam-masking/contracts/cli.md`'s prompt-file-format section -- the same
@@ -112,7 +112,7 @@ specs/008-level-agnostic-prompts/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── prompts/
 │   └── model.py             # CHANGED: PromptSet.level field; physical conversion method;
 │                             #          load_prompt_file requires "level"; to_record() wraps

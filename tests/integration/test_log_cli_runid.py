@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from organ_masker_lite.cli import main
+from ome_zarr_masker.cli import main
 
 from ..conftest import sam2_available
 

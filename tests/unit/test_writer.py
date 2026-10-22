@@ -7,9 +7,9 @@ import math
 import numpy as np
 import pytest
 
-from organ_masker_lite.io.reader import OmeZarrReader
-from organ_masker_lite.io.validate import validate_ome_zarr
-from organ_masker_lite.io.writer import WriterError, write_mask
+from ome_zarr_masker.io.reader import OmeZarrReader
+from ome_zarr_masker.io.validate import validate_ome_zarr
+from ome_zarr_masker.io.writer import WriterError, write_mask
 
 from ..conftest import assert_ome_zarr_models_valid, write_ome_zarr
 
@@ -82,7 +82,7 @@ def _vectors_oracle(src_shape, src_scale, src_trans, dst_shape, dst_scale, dst_t
 
 
 def test_nn_indices_translation_free_matches_reference_resize():
-    from organ_masker_lite.io.writer import _nn_indices
+    from ome_zarr_masker.io.writer import _nn_indices
 
     src = (16, 32, 32)
     for dst, dst_scale in [((8, 16, 16), (2, 2, 2)), ((32, 64, 64), (0.5, 0.5, 0.5))]:
@@ -92,7 +92,7 @@ def test_nn_indices_translation_free_matches_reference_resize():
 
 
 def test_nn_indices_half_pixel_translations_non_exact_ratio_match_oracle():
-    from organ_masker_lite.io.writer import _nn_indices
+    from ome_zarr_masker.io.writer import _nn_indices
 
     # DANDI 001278 y axis: level 3 (874) -> level 2 (1747) and level 4 (437), real transforms
     s3, t3 = 63.040823798627, 27.576411899313502
@@ -106,7 +106,7 @@ def test_nn_indices_half_pixel_translations_non_exact_ratio_match_oracle():
 
 
 def test_nn_indices_identity_tie_and_bounds():
-    from organ_masker_lite.io.writer import _nn_indices
+    from ome_zarr_masker.io.writer import _nn_indices
 
     same = _nn_indices((5, 6, 7), (2, 2, 2), (1, 1, 1), (5, 6, 7), (2, 2, 2), (1, 1, 1))
     assert [v.tolist() for v in same] == [list(range(5)), list(range(6)), list(range(7))]
@@ -195,7 +195,7 @@ def _dandi_style_reader(tmp_path):
 
 
 def test_write_matches_oracle_half_pixel_non_exact(tmp_path, monkeypatch):
-    from organ_masker_lite.io import writer
+    from ome_zarr_masker.io import writer
 
     monkeypatch.setattr(writer, "DEFAULT_CHUNKS", (4, 4, 4))
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 8)  # several shards per level
@@ -228,7 +228,7 @@ def _failing_after(n, real):
 
 
 def test_mid_write_failure_leaves_nothing_behind(tmp_path, monkeypatch):
-    from organ_masker_lite.io import writer
+    from ome_zarr_masker.io import writer
 
     monkeypatch.setattr(writer, "DEFAULT_CHUNKS", (4, 4, 4))
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 4)
@@ -243,7 +243,7 @@ def test_mid_write_failure_leaves_nothing_behind(tmp_path, monkeypatch):
 
 
 def test_failed_overwrite_keeps_previous_output(tmp_path, monkeypatch):
-    from organ_masker_lite.io import writer
+    from ome_zarr_masker.io import writer
 
     reader = _reader(tmp_path)
     out = tmp_path / "out.ome.zarr"
@@ -316,7 +316,7 @@ def test_mostly_background_mask_is_small_on_disk(tmp_path):
 def test_reading_one_shard_touches_one_shard_file(tmp_path, monkeypatch):
     import zarr
 
-    from organ_masker_lite.io import writer
+    from ome_zarr_masker.io import writer
 
     monkeypatch.setattr(writer, "DEFAULT_CHUNKS", (4, 4, 4))
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 8)

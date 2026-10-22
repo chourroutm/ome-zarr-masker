@@ -78,7 +78,7 @@ rejected as the default.
 
 ## R6. Default location and version control
 
-**Decision**: Default log directory is `./organ_masker_logs/` (working-directory subdir),
+**Decision**: Default log directory is `./ome_zarr_masker_logs/` (working-directory subdir),
 overridable via a `--log-dir` option and an environment variable. The default directory is added to
 the project `.gitignore`.
 

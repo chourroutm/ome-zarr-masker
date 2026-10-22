@@ -56,7 +56,7 @@ No GPU/SAM2 is needed for the writer tests; they build masks directly.
 
 **Target Platform**: Linux/macOS CLI and Python library (unchanged).
 
-**Project Type**: Single project (library + CLI), layout under `src/organ_masker_lite/`.
+**Project Type**: Single project (library + CLI), layout under `src/ome_zarr_masker/`.
 
 **Performance Goals**:
 - **Memory (SC-001/FR-002)**: during the write, peak memory ≤ run-level mask + budget (default
@@ -74,7 +74,7 @@ pass the project's own `validate_ome_zarr` and `OmeZarrReader` (FR-009). The wor
 of `RunConfig.to_record()`, so the run record is unaffected by it (FR-012) and CLI/API parity
 holds. `--workers < 1` is rejected before anything is written (FR-011).
 
-**Scale/Scope**: Rewrite of `src/organ_masker_lite/io/writer.py`. Small wiring in
+**Scale/Scope**: Rewrite of `src/ome_zarr_masker/io/writer.py`. Small wiring in
 `engine/pipeline.py` (`run_masking` passes `workers`/`progress` through), `cli.py` (`--workers`),
 `api.py` (`MaskResult.save(workers=, progress=)`) and `input_log.py` (one per-level write line).
 Docs: README, feature 001's CLI/API contracts. Interactive export is unchanged and uses the
@@ -128,7 +128,7 @@ specs/009-scalable-mask-writer/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── io/
 │   └── writer.py            # REWRITTEN: plan_layouts(), resolve_workers(), shard block
 │                            #   computation, threaded sharded write; same write_mask() entry

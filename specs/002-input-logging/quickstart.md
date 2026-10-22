@@ -7,18 +7,18 @@ duplicating them (see [contracts/](./contracts/), [data-model.md](./data-model.m
 
 ## Prerequisites
 
-- The organ-masker-lite package installed (feature 001), with a backend extra for real runs; the
+- The ome-zarr-masker package installed (feature 001), with a backend extra for real runs; the
   stub backend suffices for logging tests.
 - A synthetic OME-Zarr v0.5 input and a prompt file (reuse feature 001's test fixtures).
 - Logging needs no extra dependencies (standard library only). Default log directory is
-  `./organ_masker_logs/`.
+  `./ome_zarr_masker_logs/`.
 
 ## Scenario 1 — CLI run is logged (US1)
 
 ```bash
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts prompts.json --axes z
-ls organ_masker_logs/                      # a <run-id>.log file exists
-grep -i "command\|level\|axes" organ_masker_logs/*.log
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json --axes z
+ls ome_zarr_masker_logs/                      # a <run-id>.log file exists
+grep -i "command\|level\|axes" ome_zarr_masker_logs/*.log
 ```
 
 Expected: a plain-text log file recording the command line, the resolved effective configuration,
@@ -27,9 +27,9 @@ and the prompts. (C-LOG-CLI-1)
 ## Scenario 2 — Failed run is still logged (US1)
 
 ```bash
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts prompts.json --level 999  # bad level
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json --level 999  # bad level
 echo "exit: $?"                             # non-zero
-ls organ_masker_logs/                       # a log file for this failed run still exists
+ls ome_zarr_masker_logs/                       # a log file for this failed run still exists
 ```
 
 Expected: the run exits non-zero with no output mask, yet a log file capturing the attempted command
@@ -38,7 +38,7 @@ and config is present. (C-LOG-CLI-2, FR-002)
 ## Scenario 3 — stdout stays clean (US1)
 
 ```bash
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts prompts.json --axes z 1>stdout.txt 2>stderr.txt
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json --axes z 1>stdout.txt 2>stderr.txt
 grep -ci "log" stdout.txt                    # expect 0 logging lines on stdout
 ```
 
@@ -47,7 +47,7 @@ Expected: no logging output on stdout; any logging notices are on stderr only. (
 ## Scenario 4 — API prompts are logged equivalently (US2)
 
 ```python
-from organ_masker_lite import OrganMaskPredictor
+from ome_zarr_masker import OrganMaskPredictor
 
 p = OrganMaskPredictor(backend="sam2")
 p.set_volume("input.ome.zarr", level=3)
@@ -63,7 +63,7 @@ C-LOG-API-3)
 ## Scenario 5 — Override destination and verbosity (US3)
 
 ```bash
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts prompts.json \
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json \
   --log-dir /tmp/oml-logs --log-level WARNING
 ls /tmp/oml-logs/                            # log written to the overridden directory
 ```
@@ -74,7 +74,7 @@ recording the core invocation/prompt detail. (C-LOG-CLI-6, FR-007)
 ## Scenario 6 — Best-effort on unwritable destination (FR-009)
 
 ```bash
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts prompts.json \
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json \
   --log-dir /proc/forbidden 2>stderr.txt
 echo "exit: $?"                              # masking still succeeds (0)
 grep -i "warn" stderr.txt                    # a logging warning is present

@@ -8,7 +8,7 @@ rather than duplicating them.
 
 ## Prerequisites
 
-- organ-masker-lite installed (a plain `pip install -e .` is enough — `ome-zarr-models>=1.6` and
+- ome-zarr-masker installed (a plain `pip install -e .` is enough — `ome-zarr-models>=1.6` and
   `zarr>=3` come in as declared dependencies). No backend extra and no validator command on `PATH`
   are required for validation.
 - The synthetic OME-Zarr v0.5 fixture from `tests/conftest.py::write_ome_zarr` (reused by the
@@ -21,7 +21,7 @@ rather than duplicating them.
 env PATH=/usr/bin:/bin .venv/bin/python - <<'PY'
 import shutil
 assert shutil.which("ome-zarr-models") is None   # no validator command on PATH
-from organ_masker_lite.io.validate import validate_ome_zarr
+from ome_zarr_masker.io.validate import validate_ome_zarr
 validate_ome_zarr("path/to/valid.ome.zarr")       # returns None, no raise
 print("valid")
 PY
@@ -43,7 +43,7 @@ Expected: the in-process validation test passes and confirms no child process is
 
 ```bash
 .venv/bin/python - <<'PY'
-from organ_masker_lite.io.validate import validate_ome_zarr, ValidationError
+from ome_zarr_masker.io.validate import validate_ome_zarr, ValidationError
 for bad in ["does/not/exist.ome.zarr", "path/to/not_a_zarr_dir"]:
     try:
         validate_ome_zarr(bad)
@@ -59,7 +59,7 @@ not a valid OME-Zarr v0.5 store. (C-VAL-3, C-VAL-4, SC-002)
 ## Scenario 4 — End-to-end CLI run validates from a plain install (US1)
 
 ```bash
-organ-masker-lite mask valid.ome.zarr out.ome.zarr --prompts prompts.json --backend stub --level 0
+ome-zarr-masker mask valid.ome.zarr out.ome.zarr --prompts prompts.json --backend stub --level 0
 echo "exit: $?"     # 0 — validation passed without any PATH setup
 ```
 

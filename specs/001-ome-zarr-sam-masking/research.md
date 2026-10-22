@@ -122,7 +122,7 @@ coarser-is-faster outcome (SC-006) easy to demonstrate.
 **Decision**: A `backends/registry.py` resolves a backend by name; **sam2** is the default, **sam3**
 selectable, both first-class behind the `VideoSegmenterBackend` protocol. Model weights resolve from
 a model directory defaulting to a subdirectory of the **current working directory**
-(`./organ_masker_models/` by default), overridable by CLI option and environment variable. Missing
+(`./ome_zarr_masker_models/` by default), overridable by CLI option and environment variable. Missing
 weights are **auto-downloaded** into that directory on first use; a `--no-download` opt-out disables
 this and yields a clear error when weights are absent. The default model directory is added to the
 project `.gitignore`.

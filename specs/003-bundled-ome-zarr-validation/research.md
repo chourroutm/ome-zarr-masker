@@ -34,7 +34,7 @@ in-process call to `ome_zarr_models.open_ome_zarr(store, version="0.5")`, wrappe
 
 **Decision**: Pass `version="0.5"`.
 
-**Rationale**: organ-masker-lite is explicitly an OME-Zarr **v0.5** tool — the reader, writer, and
+**Rationale**: ome-zarr-masker is explicitly an OME-Zarr **v0.5** tool — the reader, writer, and
 all contracts target v0.5, and the spec states v0.5 remains the only supported input version
 (Assumptions). Pinning `version="0.5"` makes validation assert the version the rest of the pipeline
 requires, rather than silently accepting a v0.4 store that the downstream reader would then fail on

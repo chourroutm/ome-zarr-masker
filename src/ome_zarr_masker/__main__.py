@@ -1,4 +1,4 @@
-"""Enable ``python -m organ_masker_lite``."""
+"""Enable ``python -m ome_zarr_masker``."""
 
 from .cli import main
 

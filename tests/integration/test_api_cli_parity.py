@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from organ_masker_lite import OrganMaskPredictor
-from organ_masker_lite.cli import main
-from organ_masker_lite.io.reader import OmeZarrReader
+from ome_zarr_masker import OrganMaskPredictor
+from ome_zarr_masker.cli import main
+from ome_zarr_masker.io.reader import OmeZarrReader
 
 from ..conftest import sam2_available
 
@@ -69,7 +69,7 @@ def test_api_and_cli_produce_equivalent_masks(single_blob_zarr, tmp_path):
 @pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
 def test_api_and_cli_agree_across_worker_counts(single_blob_zarr, tmp_path):
     """Feature 009 (C-W-API-1/2/4): worker count changes neither the output nor the run record."""
-    from organ_masker_lite.io.writer import WriterError
+    from ome_zarr_masker.io.writer import WriterError
 
     store, (cx, cy), frame = single_blob_zarr
     prompts_file = tmp_path / "p.json"

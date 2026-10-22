@@ -144,7 +144,7 @@ violating Constitution II (every behavioral change backed by a test that can act
 to its physical position on the authoring level (`i * scale + translation`, from the level's
 OME-Zarr `coordinateTransformations`; scale 1 and translation 0 when absent). It then snaps to the
 nearest pixel centre on the run level, with exact ties to the lower pixel. The formula lives in
-`src/organ_masker_lite/geometry.py::nearest_index`, so feature 009's mask writer can reuse it.
+`src/ome_zarr_masker/geometry.py::nearest_index`, so feature 009's mask writer can reuse it.
 `OmeZarrReader.level_transform(level)` exposes each level's `(scale, translation)`.
 `PromptSet.resolved_for_shape(src_shape, dst_shape, axis)` became
 `PromptSet.resolved_between(src_geometry, dst_geometry, axis)`, vectorised across all prompts

@@ -28,7 +28,7 @@ fixture (`tests/conftest.py::write_ome_zarr`) provides valid/invalid stores. No 
 
 **Target Platform**: Linux/macOS CLI and Python library.
 
-**Project Type**: Single project (library + CLI), existing layout under `src/organ_masker_lite/`.
+**Project Type**: Single project (library + CLI), existing layout under `src/ome_zarr_masker/`.
 
 **Performance Goals**: Per-run input-validation time MUST NOT increase versus the subprocess approach
 (SC-005). In-process validation removes a Python interpreter sub-process spawn, so it is expected to
@@ -81,7 +81,7 @@ specs/003-bundled-ome-zarr-validation/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 └── io/
     └── validate.py          # CHANGED: in-process open_ome_zarr(..., version="0.5") gate
 

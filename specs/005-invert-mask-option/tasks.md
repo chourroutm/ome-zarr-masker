@@ -25,13 +25,13 @@ this feature adds one field, one post-processing step, and one CLI flag to exist
 
 ## Path Conventions
 
-Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/`.
+Single Python package, `src/` layout: `src/ome_zarr_masker/`, tests in `tests/`.
 
 ---
 
 ## Phase 1: User Story 1 - Produce a mask-out (background-labeled) output (Priority: P1) 🎯 MVP
 
-**Goal**: `organ-masker-lite mask ... --invert` writes a binary output mask whose values are the
+**Goal**: `ome-zarr-masker mask ... --invert` writes a binary output mask whose values are the
 exact voxel-wise complement of the non-inverted output, applied after `--combine`/`--fill-holes`/
 `--dilate`/`--erode` so those flags always shape the organ-labeled region (FR-001–FR-008).
 
@@ -52,8 +52,8 @@ with it; confirm the two outputs are exact voxel-wise complements (quickstart.md
       `False` when only `invert=True` is set (all other fields at their defaults); and
       `RunConfig.to_record()["postprocess"]` includes `"invert"` reflecting the configured value,
       in `tests/unit/test_config.py` (FR-006, data-model.md)
-- [X] T003 [P] [US1] Contract test: `organ-masker-lite mask --help` output contains a description
-      of `--invert` (C-CLI-8), and `organ-masker-lite interactive --invert` exits non-zero with
+- [X] T003 [P] [US1] Contract test: `ome-zarr-masker mask --help` output contains a description
+      of `--invert` (C-CLI-8), and `ome-zarr-masker interactive --invert` exits non-zero with
       argparse's "unrecognized arguments" message (C-CLI-9), in `tests/contract/test_cli_mask.py`
       (FR-007, FR-008)
 - [X] T004 [P] [US1] Integration test (`real_backend`-gated, mirrors existing fixtures in this
@@ -69,16 +69,16 @@ with it; confirm the two outputs are exact voxel-wise complements (quickstart.md
 ### Implementation for User Story 1
 
 - [X] T005 [US1] Add `invert: bool = False` field to `PostProcessConfig` in
-      `src/organ_masker_lite/config.py`; update the `is_noop` property to
+      `src/ome_zarr_masker/config.py`; update the `is_noop` property to
       `not self.fill_holes and self.dilation_radius == 0 and self.erosion_radius == 0 and not self.invert`;
       update `RunConfig.to_record()`'s `postprocess` dict to add `"invert": self.postprocess.invert`
       (depends on T002 failing first) (data-model.md)
-- [X] T006 [P] [US1] In `postprocess_mask()` (`src/organ_masker_lite/postprocess/morphology.py`),
+- [X] T006 [P] [US1] In `postprocess_mask()` (`src/ome_zarr_masker/postprocess/morphology.py`),
       add the invert step as the last operation, after dilation, erosion, and fill-holes: when
       `config.invert` is `True`, negate the boolean mask (`out = ~out`) before returning; update the
       module docstring's documented order to `dilation, erosion, fill-holes, invert` (depends on
       T005; depends on T001 failing first) (FR-003, FR-004, research.md R1)
-- [X] T007 [P] [US1] Add `--invert` to the `mask` subparser only in `src/organ_masker_lite/cli.py`
+- [X] T007 [P] [US1] Add `--invert` to the `mask` subparser only in `src/ome_zarr_masker/cli.py`
       (`action="store_true"`, default `False`, help text stating it swaps the mask's foreground/
       background values); pass `invert=args.invert` into the `PostProcessConfig(...)` construction
       in `_cmd_mask`; do NOT add it to the `interactive` subparser (depends on T005; depends on T003
@@ -146,8 +146,8 @@ Task: "Contract test for --invert help text and interactive rejection in tests/c
 Task: "Integration test for end-to-end complement property in tests/integration/test_us5_postprocess.py (T004)"
 
 # Implementation, after T005 lands:
-Task: "Apply invert as the final postprocess_mask() step in src/organ_masker_lite/postprocess/morphology.py (T006)"
-Task: "Add --invert to the mask subparser in src/organ_masker_lite/cli.py (T007)"
+Task: "Apply invert as the final postprocess_mask() step in src/ome_zarr_masker/postprocess/morphology.py (T006)"
+Task: "Add --invert to the mask subparser in src/ome_zarr_masker/cli.py (T007)"
 ```
 
 ---
@@ -169,4 +169,4 @@ Task: "Add --invert to the mask subparser in src/organ_masker_lite/cli.py (T007)
 - Commit after each task or logical group (e.g., T001-T004 together as the failing/red baseline,
   then T005, then T006+T007 together as the green implementation)
 - `interactive` subcommand is explicitly out of scope (FR-008) — no task touches
-  `src/organ_masker_lite/interactive.py`
+  `src/ome_zarr_masker/interactive.py`

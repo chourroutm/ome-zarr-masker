@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from organ_masker_lite.cli import main
+from ome_zarr_masker.cli import main
 
 
 def _write_prompts(path, frame, cx, cy):
@@ -43,5 +43,5 @@ def test_failed_cli_run_still_writes_log(single_blob_zarr, tmp_path):
     logs = list(logdir.glob("*.log"))
     assert len(logs) == 1
     text = logs[0].read_text()
-    assert "command: organ-masker-lite mask" in text
+    assert "command: ome-zarr-masker mask" in text
     assert "outcome: failed" in text

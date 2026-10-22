@@ -8,7 +8,7 @@ unchanged testing boundary — see plan.md Technical Context).
 ## 1. Confirm points+box on the same frame merge into one prompt (no silent drop)
 
 ```python
-from organ_masker_lite.interactive import InteractiveSession
+from ome_zarr_masker.interactive import InteractiveSession
 
 session = InteractiveSession("<input.ome.zarr>", level=0)
 session.add_positive_point(frame_index=4, x=8, y=8)
@@ -37,11 +37,11 @@ cat > prompts.json <<'EOF'
 {"objects": [{"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}],
               "box": {"frame": 4, "xyxy": [2, 2, 20, 20]}}]}
 EOF
-organ-masker-lite mask <input.ome.zarr> cli_out.ome.zarr --prompts prompts.json --level 0 --axes z
+ome-zarr-masker mask <input.ome.zarr> cli_out.ome.zarr --prompts prompts.json --level 0 --axes z
 ```
 
 ```python
-from organ_masker_lite.io.reader import OmeZarrReader
+from ome_zarr_masker.io.reader import OmeZarrReader
 cli_mask = OmeZarrReader("cli_out.ome.zarr").read_level(0)
 assert np.array_equal(interactive_mask.astype("uint8"), cli_mask)
 ```
@@ -51,7 +51,7 @@ Expected: masks are identical. Validates C-UI-15/SC-004.
 ## 3. Manual GUI walkthrough — layers and appearance (C-UI-1 through C-UI-6)
 
 ```sh
-organ-masker-lite interactive <input.ome.zarr>
+ome-zarr-masker interactive <input.ome.zarr>
 ```
 
 - Confirm the layers list shows `volume`, `positive-points`, `negative-points`, `positive-box`

@@ -7,7 +7,7 @@ extra to use it.
 The predictor is built from a Hydra config name and a checkpoint file (FR-019/FR-020): the
 checkpoint is resolved against the run's model directory and auto-downloaded on first use unless
 downloads are disabled. The defaults target the SAM2.1 Hiera-Large variant; override the config
-name / checkpoint via ``ORGAN_MASKER_SAM2_CONFIG`` / ``ORGAN_MASKER_SAM2_CHECKPOINT`` if your
+name / checkpoint via ``OME_ZARR_MASKER_SAM2_CONFIG`` / ``OME_ZARR_MASKER_SAM2_CHECKPOINT`` if your
 installed ``sam2`` build ships different config paths.
 """
 
@@ -29,8 +29,8 @@ _DEFAULT_CONFIG = "configs/sam2.1/sam2.1_hiera_l.yaml"
 _DEFAULT_CHECKPOINT = "sam2.1_hiera_large.pt"
 _CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt"
 
-_CONFIG_ENV = "ORGAN_MASKER_SAM2_CONFIG"
-_CHECKPOINT_ENV = "ORGAN_MASKER_SAM2_CHECKPOINT"
+_CONFIG_ENV = "OME_ZARR_MASKER_SAM2_CONFIG"
+_CHECKPOINT_ENV = "OME_ZARR_MASKER_SAM2_CHECKPOINT"
 
 
 class Sam2Backend:
@@ -44,7 +44,7 @@ class Sam2Backend:
         except Exception as exc:  # noqa: BLE001
             raise ImportError(
                 "SAM2 requires the '[sam2]' extra (torch + sam2). Install it with: "
-                "pip install 'organ-masker-lite[sam2]'"
+                "pip install 'ome-zarr-masker[sam2]'"
             ) from exc
         self._torch = torch
         self._build = build_sam2_video_predictor

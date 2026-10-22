@@ -12,10 +12,10 @@ and treat file count as a concrete complexity metric. This version reflects that
 
 ## Summary
 
-Repurpose organ-masker-lite from a dual-backend (SAM2/SAM3), selectable-backend tool into a tool
+Repurpose ome-zarr-masker from a dual-backend (SAM2/SAM3), selectable-backend tool into a tool
 where SAM2 is the only thing that ever runs, called directly with no abstraction layer at all. The
 `backends/` package (`base.py` Protocol, `registry.py` factory/registry, `sam2.py`, `sam3.py`,
-`__init__.py` — 5 files) is deleted and replaced by a single `src/organ_masker_lite/sam2.py`
+`__init__.py` — 5 files) is deleted and replaced by a single `src/ome_zarr_masker/sam2.py`
 module. Every `--backend`/`backend=` surface (CLI flag, `RunConfig` field, `OrganMaskPredictor`/
 `InteractiveSession` constructor parameter, and the `compute_mask`/`run_masking` object-injection
 parameter) is removed outright — there is nothing to select, boolean or otherwise. The test suite's
@@ -68,7 +68,7 @@ or registry; installing/running the project MUST NOT require or offer a backend 
 **Scale/Scope**: Same single-user, single-volume-per-run scope as spec 001. Scope of this feature:
 delete 6 files (`backends/` package's 5 files + `test_backend_comparison.py`), add 1 file
 (`sam2.py`), delete 1 more file (`test_us1_sam2_smoke.py`, now redundant), and edit roughly 25 other
-files (`data-model.md`'s full inventory) — net file count in `src/organ_masker_lite/` decreases by 4.
+files (`data-model.md`'s full inventory) — net file count in `src/ome_zarr_masker/` decreases by 4.
 
 ## Constitution Check
 
@@ -121,7 +121,7 @@ specs/004-sam2-only-integration/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── __init__.py
 ├── io/                       # unchanged (reader.py, writer.py, validate.py)
 ├── prompts/

@@ -394,7 +394,7 @@ def _require_napari():
     except Exception as exc:  # noqa: BLE001
         raise ImportError(
             "the interactive session requires the '[interactive]' extra (napari + Qt). "
-            "Install it with: pip install 'organ-masker-lite[interactive]'"
+            "Install it with: pip install 'ome-zarr-masker[interactive]'"
         ) from exc
     return napari
 

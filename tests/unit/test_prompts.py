@@ -7,7 +7,7 @@ import json
 import numpy as np
 import pytest
 
-from organ_masker_lite.prompts.model import (
+from ome_zarr_masker.prompts.model import (
     Prompt,
     PromptError,
     PromptSet,

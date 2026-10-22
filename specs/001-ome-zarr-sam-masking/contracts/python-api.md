@@ -8,7 +8,7 @@ minimal learning (FR-010, SC-004). It is a thin facade over the shared engine.
 ## Entry point: `OrganMaskPredictor`
 
 ```python
-from organ_masker_lite import OrganMaskPredictor
+from ome_zarr_masker import OrganMaskPredictor
 
 predictor = OrganMaskPredictor(backend="sam2", model_dir=None, allow_download=True)
 predictor.set_volume("input.ome.zarr", level=3)            # mirrors SAM set_image
@@ -21,7 +21,7 @@ mask.save("output.ome.zarr")
 
 `OrganMaskPredictor(backend="sam2", model_dir=None, allow_download=True)`
 - `backend`: `"sam2"` (default) or `"sam3"` (FR-018).
-- `model_dir`: override the default `./organ_masker_models` (FR-019). `None` => default/env.
+- `model_dir`: override the default `./ome_zarr_masker_models` (FR-019). `None` => default/env.
 - `allow_download`: auto-download missing weights when true; else error if absent (FR-020).
 
 ### `set_volume(store_path, level=<default>)`

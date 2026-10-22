@@ -9,7 +9,7 @@ feature touches, since removal is the substance of this feature.
 
 | Aspect | Value |
 |---|---|
-| Type | `Sam2Backend` class, `src/organ_masker_lite/sam2.py` (new location; was `backends/sam2.py`) |
+| Type | `Sam2Backend` class, `src/ome_zarr_masker/sam2.py` (new location; was `backends/sam2.py`) |
 | Conforms to | No Protocol — called directly by type, no structural typing layer |
 | Constructed by | `engine/pipeline.py`, unconditionally, no name/lookup involved |
 | Interface | `segment_video(frames: np.ndarray, prompts: PromptSet) -> np.ndarray` — unchanged |
@@ -21,7 +21,7 @@ predictor caching). Only its registry-facing `name = "sam2"` attribute is remove
 
 | Aspect | Before | After |
 |---|---|---|
-| `src/organ_masker_lite/backends/` | 5 files: `__init__.py`, `base.py`, `registry.py`, `sam2.py`, `sam3.py` | Deleted; replaced by 1 file: `src/organ_masker_lite/sam2.py` |
+| `src/ome_zarr_masker/backends/` | 5 files: `__init__.py`, `base.py`, `registry.py`, `sam2.py`, `sam3.py` | Deleted; replaced by 1 file: `src/ome_zarr_masker/sam2.py` |
 | CLI `--backend` flag | Present (`mask` and `interactive` subcommands) | Removed entirely |
 | `RunConfig.backend` field | `str = "sam2"` | Removed (run-record still emits a constant `"backend": "sam2"`) |
 | `OrganMaskPredictor(backend=...)` | Present | Removed |
@@ -40,7 +40,7 @@ predictor caching). Only its registry-facing `name = "sam2"` attribute is remove
 
 ## Removal / Change Inventory
 
-### Source (`src/organ_masker_lite/`)
+### Source (`src/ome_zarr_masker/`)
 
 | File | Change |
 |---|---|
@@ -112,8 +112,8 @@ parameter no longer exists), mark the test `@pytest.mark.real_backend`, and skip
 
 | Change |
 |---|
-| Delete `StubBackend`, `StubBackendDilate`, the `stub_backend` fixture, `from organ_masker_lite.backends.registry import register_backend`, both `register_backend(...)` calls |
-| Replace `real_backend_available(name: str)` with `sam2_available() -> bool`: try constructing `Sam2Backend()` (from `organ_masker_lite.sam2`), return `False` on `ImportError` |
+| Delete `StubBackend`, `StubBackendDilate`, the `stub_backend` fixture, `from ome_zarr_masker.backends.registry import register_backend`, both `register_backend(...)` calls |
+| Replace `real_backend_available(name: str)` with `sam2_available() -> bool`: try constructing `Sam2Backend()` (from `ome_zarr_masker.sam2`), return `False` on `ImportError` |
 | Keep unchanged: `write_ome_zarr`, `single_blob_zarr`, `two_blob_zarr` fixtures, `isolate_logs` autouse fixture |
 
 ## Validation rule carried over unchanged

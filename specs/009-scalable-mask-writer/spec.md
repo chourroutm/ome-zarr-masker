@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Fix GitHub issue #3 (chourroutm/organ-masker-lite): the OME-Zarr mask writer does not scale to large volumes. It materializes every pyramid level fully in memory before writing, and writes each level as a single uncompressed chunk. Reported reproduction: a level-0 shape of (7526, 6985, 6985) with 5 levels needed ~370 GB RAM to write the output mask and produced 391 GB on disk for a highly compressible binary mask; the single-chunk-per-level layout also can't be read lazily by viewers or downstream tools. Goal: handle large real-world volumes without the whole output pyramid fitting in memory, and produce compressed, lazily-readable OME-Zarr output comparable to well-formed OME-Zarr pyramids."
+**Input**: User description: "Fix GitHub issue #3 (chourroutm/ome-zarr-masker): the OME-Zarr mask writer does not scale to large volumes. It materializes every pyramid level fully in memory before writing, and writes each level as a single uncompressed chunk. Reported reproduction: a level-0 shape of (7526, 6985, 6985) with 5 levels needed ~370 GB RAM to write the output mask and produced 391 GB on disk for a highly compressible binary mask; the single-chunk-per-level layout also can't be read lazily by viewers or downstream tools. Goal: handle large real-world volumes without the whole output pyramid fitting in memory, and produce compressed, lazily-readable OME-Zarr output comparable to well-formed OME-Zarr pyramids."
 
 ## Clarifications
 

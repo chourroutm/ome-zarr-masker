@@ -10,9 +10,9 @@ import json
 
 import pytest
 
-from organ_masker_lite import OrganMaskPredictor
-from organ_masker_lite.io.reader import OmeZarrReader
-from organ_masker_lite.prompts.model import PromptError
+from ome_zarr_masker import OrganMaskPredictor
+from ome_zarr_masker.io.reader import OmeZarrReader
+from ome_zarr_masker.prompts.model import PromptError
 
 from ..conftest import sam2_available
 

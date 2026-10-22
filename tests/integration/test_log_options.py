@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from organ_masker_lite.cli import main
+from ome_zarr_masker.cli import main
 
 from ..conftest import sam2_available
 
@@ -61,7 +61,7 @@ def test_default_log_dir_falls_back_to_env(single_blob_zarr, tmp_path, monkeypat
     prompts = tmp_path / "p.json"
     _write_prompts(prompts, frame, cx, cy)
     envdir = tmp_path / "env_logs"
-    monkeypatch.setenv("ORGAN_MASKER_LOG_DIR", str(envdir))
+    monkeypatch.setenv("OME_ZARR_MASKER_LOG_DIR", str(envdir))
     code = main(
         [
             "mask",

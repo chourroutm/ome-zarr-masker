@@ -9,7 +9,7 @@ proxy for repository complexity. This document reflects that final direction.
 
 ## Decision 1: Delete the SAM3 adapter and its gated-weights/tokenizer machinery outright
 
-**Decision**: Delete `src/organ_masker_lite/backends/sam3.py` in full. Drop the `sam3`
+**Decision**: Delete `src/ome_zarr_masker/backends/sam3.py` in full. Drop the `sam3`
 optional-dependency extra from `pyproject.toml`.
 
 **Rationale**: FR-001/FR-005/FR-006. Confirmed by `grep -rli sam3` that this is the only SAM3-specific
@@ -20,10 +20,10 @@ code in the project.
 
 ## Decision 2: Delete the backend Protocol and registry; collapse `backends/` into one module
 
-**Decision**: Delete `src/organ_masker_lite/backends/` in full — `__init__.py`, `base.py`
+**Decision**: Delete `src/ome_zarr_masker/backends/` in full — `__init__.py`, `base.py`
 (`VideoSegmenterBackend` Protocol), `registry.py` (`register_backend`/`get_backend`/
 `available_backends`/`BackendError`), `sam2.py`, `sam3.py` (5 files). Create one new module,
-`src/organ_masker_lite/sam2.py`, containing the SAM2 adapter class (unchanged internals, minus its
+`src/ome_zarr_masker/sam2.py`, containing the SAM2 adapter class (unchanged internals, minus its
 `name = "sam2"` class attribute, which only existed for registry lookup). `engine/pipeline.py` and
 `engine/sweep.py` import this class directly and construct/type-hint against it — no Protocol, no
 factory, no name string anywhere in the call path.
@@ -36,10 +36,10 @@ also removes: (a) selecting among multiple *production* backends (SAM3 is gone),
 named test doubles (the CPU-only stand-in is gone — see Decision 3). With both gone, the registry
 has no remaining caller.
 
-**Naming note**: `src/organ_masker_lite/sam2.py` shares its name with the third-party `sam2` PyPI
+**Naming note**: `src/ome_zarr_masker/sam2.py` shares its name with the third-party `sam2` PyPI
 package it imports (`from sam2.build_sam import build_sam2_video_predictor`). This is safe under
 Python 3's absolute-import semantics — a bare `import sam2`/`from sam2...` inside
-`organ_masker_lite/sam2.py` resolves to the top-level installed package, not to itself; only an
+`ome_zarr_masker/sam2.py` resolves to the top-level installed package, not to itself; only an
 explicit relative import (`from . import sam2`) would self-reference. No import shadowing occurs.
 
 **Alternatives considered**:

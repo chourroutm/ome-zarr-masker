@@ -6,11 +6,11 @@
 
 **Status**: Draft
 
-**Input**: User description: "Create a Python package based on https://github.com/HiPCTProject/organ-masker but with best practices, focusing on adding functionalities step by step. organ-masker-lite accepts an ome-zarr v0.5 image as input and creates an ome-zarr v0.5 mask as final output. it uses sam as a backend, by creating a video of every slice in forward-only or forward and reverse modes, combining outputs from each axis. it features an interactive mode and a cli one-shot mode, along with an api to input landmark locations to sam (this api has to be straightforward to use, by making it similar in structure to the sam api). it has to leverage the different binning levels within an ome-zarr, so that the user can pick which level to use. postprocessing of the mask such as dilation/erosion or fill-holes are optional, with sensible default values"
+**Input**: User description: "Create a Python package based on https://github.com/HiPCTProject/organ-masker but with best practices, focusing on adding functionalities step by step. ome-zarr-masker accepts an ome-zarr v0.5 image as input and creates an ome-zarr v0.5 mask as final output. it uses sam as a backend, by creating a video of every slice in forward-only or forward and reverse modes, combining outputs from each axis. it features an interactive mode and a cli one-shot mode, along with an api to input landmark locations to sam (this api has to be straightforward to use, by making it similar in structure to the sam api). it has to leverage the different binning levels within an ome-zarr, so that the user can pick which level to use. postprocessing of the mask such as dilation/erosion or fill-holes are optional, with sensible default values"
 
 ## Overview
 
-organ-masker-lite produces a 3D segmentation mask of an organ (or other structure) from a
+ome-zarr-masker produces a 3D segmentation mask of an organ (or other structure) from a
 large volumetric image, using a foundation segmentation model (SAM-family) guided by a small
 set of user-placed landmarks. The volume is processed as stacks of 2D slices: each axis is
 swept slice-by-slice so the model can propagate a segmentation from the landmark slices through
@@ -370,4 +370,4 @@ mask.
   weights are pre-placed.
 - The OME-Zarr v0.5 specification for both reading inputs and writing outputs.
 - The reference behavior of the existing HiPCTProject/organ-masker project as functional
-  inspiration (organ-masker-lite is a clean reimplementation, not a fork constrained by its code).
+  inspiration (ome-zarr-masker is a clean reimplementation, not a fork constrained by its code).

@@ -16,7 +16,7 @@ written to fail first. All test tasks below are required.
 
 ## Path Conventions
 
-Single project: `src/organ_masker_lite/`, `tests/` at repository root.
+Single project: `src/ome_zarr_masker/`, `tests/` at repository root.
 
 ---
 
@@ -33,13 +33,13 @@ Single project: `src/organ_masker_lite/`, `tests/` at repository root.
   No test function yet, and no hard-coded timing constant (SC-005 is measured relative to `_legacy_write`
   in the same process, see T032).
 - [X] T002 In `tests/unit/test_writer.py`, add `_reference_nn_resize(mask, target_shape)` (a verbatim copy of
-  today's `src/organ_masker_lite/io/writer.py::_nn_resize`) and
+  today's `src/ome_zarr_masker/io/writer.py::_nn_resize`) and
   `_physical_nn_oracle(mask, src_scale, src_trans, dst_shape, dst_scale, dst_trans)`, which loops over every
   target index per axis, computes `x = (i*dst_scale + dst_trans - src_trans)/src_scale`, picks the nearest
   source centre with exact ties to the lower index (`i_src = floor(x)` if `x - floor(x) <= 0.5` else
   `floor(x) + 1`, clipped), and returns `mask[np.ix_(...)]`. Repoint the existing
   `test_nn_resize_preserves_labels_and_shape` at `_reference_nn_resize`, and stop importing `_nn_resize`
-  from `organ_masker_lite.io.writer`.
+  from `ome_zarr_masker.io.writer`.
 - [X] T003 Extend `tests/conftest.py::write_ome_zarr` with optional `chunks`, `shards`, `scales` and
   `translations` keyword arguments (all default `None`, which keeps today's behaviour: whole-array specs,
   `scales=[[f**i …]]`, `translations=[None]*n`). When `chunks`/`shards` are given, build each level's
@@ -79,7 +79,7 @@ uses. Pure helpers; `write_mask` itself is not rewritten yet.
   pydantic_zarr `ArraySpec` whose codec chain is `sharding_indexed(chunk_shape=layout.chunks, codecs=[bytes,
   blosc(zstd, clevel=3, bitshuffle)])`, with `fill_value == 0`, dtype `uint8`, outer chunk grid ==
   `layout.shards`, and `dimension_names == axes`.
-- [X] T007 Implement in `src/organ_masker_lite/io/writer.py`: module constants `DEFAULT_CHUNKS = (64, 64,
+- [X] T007 Implement in `src/ome_zarr_masker/io/writer.py`: module constants `DEFAULT_CHUNKS = (64, 64,
   64)`, `DEFAULT_MAX_SHARD = 1024`, `WRITE_BUDGET_BYTES = 8 * 2**30`, `COMPRESSOR =
   BloscCodec(cname="zstd", clevel=3, shuffle="bitshuffle")`; a frozen `LevelLayout(level, shape, chunks,
   shards, source)` dataclass; `_default_layout(shape)`, `_shard_regions(layout)`, `_nn_indices(...)` per
@@ -144,9 +144,9 @@ budget, and confirm peak memory stays far below the level size while the voxels 
 
 ### Implementation for User Story 1
 
-- [X] T017 [US1] In `src/organ_masker_lite/io/writer.py`, implement `resolve_workers(workers, layout)` per
+- [X] T017 [US1] In `src/ome_zarr_masker/io/writer.py`, implement `resolve_workers(workers, layout)` per
   data-model.md (validation → `WriterError`; budget derivation; oversized-shard warning).
-- [X] T018 [US1] Rewrite `write_mask` in `src/organ_masker_lite/io/writer.py` as `write_mask(output_path, mask,
+- [X] T018 [US1] Rewrite `write_mask` in `src/ome_zarr_masker/io/writer.py` as `write_mask(output_path, mask,
   run_level, reader, run_record, overwrite=False, *, workers=None, progress=None, on_level=None)`:
   - Validate `workers` first.
   - Keep the existing overwrite guard and the `.tmp` + rename atomicity.
@@ -167,16 +167,16 @@ budget, and confirm peak memory stays far below the level size while the voxels 
       success.
   - Write `run_record.json`, then rename.
   - Delete `_nn_resize` from `src/` (makes T008–T012 and T016 pass).
-- [X] T019 [US1] In `src/organ_masker_lite/engine/pipeline.py`, add `workers: int | None = None` and
+- [X] T019 [US1] In `src/ome_zarr_masker/engine/pipeline.py`, add `workers: int | None = None` and
   `on_level=None` to `run_masking` and pass `workers`, `progress` and `on_level` through to `write_mask`.
-- [X] T020 [US1] In `src/organ_masker_lite/api.py`, change `MaskResult.save` to `save(self, store_path,
+- [X] T020 [US1] In `src/ome_zarr_masker/api.py`, change `MaskResult.save` to `save(self, store_path,
   overwrite=False, *, workers=None, progress=None)` and forward both to `write_mask`; update its docstring
   per `contracts/python-api.md`.
-- [X] T021 [US1] In `src/organ_masker_lite/input_log.py`, add `InvocationLog.record_write_level(layout,
+- [X] T021 [US1] In `src/ome_zarr_masker/input_log.py`, add `InvocationLog.record_write_level(layout,
   n_shards, workers, workers_source)` emitting one `write_level: <i> shape=... chunks=... shards=...
   shards_total=<n> workers=<w> (<user|budget>) source=<input|default>` line (best-effort, like the other
   record methods).
-- [X] T022 [US1] In `src/organ_masker_lite/cli.py`, add `mask --workers` (argparse type rejecting values < 1
+- [X] T022 [US1] In `src/ome_zarr_masker/cli.py`, add `mask --workers` (argparse type rejecting values < 1
   with a clear message; default `None`; help text per `contracts/cli.md`), pass it to `run_masking(...,
   workers=args.workers, on_level=log.record_write_level)` (makes T013–T015 pass).
 
@@ -215,9 +215,9 @@ alone, and check `run_record.json`'s `output_layout`.
 
 ### Implementation for User Story 2
 
-- [X] T026 [US2] In `src/organ_masker_lite/io/writer.py`, make `_write_shard` return early, before calling
+- [X] T026 [US2] In `src/ome_zarr_masker/io/writer.py`, make `_write_shard` return early, before calling
   `_build_block`, when `mask[idx_z[r].min():idx_z[r].max()+1, ...]` has no foreground (research R4).
-- [X] T027 [US2] In `src/organ_masker_lite/io/writer.py`, add `run_record["output_layout"]` (data-model.md)
+- [X] T027 [US2] In `src/ome_zarr_masker/io/writer.py`, add `run_record["output_layout"]` (data-model.md)
   to a copy of the run record before writing `run_record.json` (makes T023–T025 pass).
 
 **Checkpoint**: US1 + US2 complete; outputs are small and viewer-friendly, and the layout is traceable.
@@ -244,9 +244,9 @@ compare each output level's `chunks`/`shards` and `output_layout[i].source`.
 
 ### Implementation for User Story 3
 
-- [X] T030 [US3] In `src/organ_masker_lite/io/reader.py`, add `OmeZarrReader.level_storage(level)` returning
+- [X] T030 [US3] In `src/ome_zarr_masker/io/reader.py`, add `OmeZarrReader.level_storage(level)` returning
   `(arr.chunks, arr.shards)` from the level's zarr array (makes T028 pass).
-- [X] T031 [US3] In `src/organ_masker_lite/io/writer.py`, make `plan_layouts(reader)` copy
+- [X] T031 [US3] In `src/ome_zarr_masker/io/writer.py`, make `plan_layouts(reader)` copy
   `level_storage(i)` when `shards is not None`, falling back to `_default_layout` (makes T029 pass).
 
 **Checkpoint**: All three stories complete.
@@ -291,7 +291,7 @@ compare each output level's `chunks`/`shards` and `output_layout[i].source`.
 - Same-file tasks are sequential: `tests/unit/test_writer.py` (T002 → T005 → T008 → T016 → T023),
   `tests/unit/test_writer_layout.py` (T004 → T006 → T009 → T010 → T011 → T024 → T025 → T029),
   `tests/performance/test_writer_perf.py` (T001 → T012 → T032),
-  `src/organ_masker_lite/io/writer.py` (T007 → T017 → T018 → T026 → T027 → T031).
+  `src/ome_zarr_masker/io/writer.py` (T007 → T017 → T018 → T026 → T027 → T031).
 
 ### Parallel Opportunities
 

@@ -9,8 +9,8 @@ plan.md Technical Context).
    correctly when set
 
 ```python
-from organ_masker_lite.config import RunConfig
-from organ_masker_lite.engine.pipeline import compute_mask
+from ome_zarr_masker.config import RunConfig
+from ome_zarr_masker.engine.pipeline import compute_mask
 
 # unset (None): identical to today -- full axis, byte-for-byte
 comp_full = compute_mask(store, prompts, RunConfig(axes=["z"]))
@@ -28,7 +28,7 @@ them there — the *caller* (interactive session) is what merges into a pre-exis
 ## 2. Manual GUI walkthrough — the three modes and their cost tiers
 
 ```sh
-organ-masker-lite interactive <large_real_input.ome.zarr>
+ome-zarr-masker interactive <large_real_input.ome.zarr>
 ```
 
 - Place a point on the current slice, trigger **single-slice** preview: result appears within

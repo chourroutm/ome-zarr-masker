@@ -8,7 +8,7 @@ programmatically are logged equivalently to the CLI prompt-file case (FR-004).
 ## Configuration
 
 `OrganMaskPredictor(..., log_dir=None, log_level=None)`
-- `log_dir`: override the default `./organ_masker_logs` (FR-007); `None` => default/env.
+- `log_dir`: override the default `./ome_zarr_masker_logs` (FR-007); `None` => default/env.
 - `log_level`: verbosity (FR-007); `None` => full-detail default.
 
 ## Behavior

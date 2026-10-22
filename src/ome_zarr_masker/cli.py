@@ -15,7 +15,7 @@ def _add_log_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--log-dir",
         default=None,
-        help="Directory for per-invocation log files (default: ./organ_masker_logs)",
+        help="Directory for per-invocation log files (default: ./ome_zarr_masker_logs)",
     )
     parser.add_argument(
         "--log-level",
@@ -26,7 +26,7 @@ def _add_log_options(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="organ-masker-lite")
+    parser = argparse.ArgumentParser(prog="ome-zarr-masker")
     sub = parser.add_subparsers(dest="command", required=True)
 
     mask = sub.add_parser("mask", help="Mask a structure in an OME-Zarr v0.5 volume.")
@@ -137,7 +137,7 @@ def _cmd_mask(args: argparse.Namespace) -> int:
     from .io.writer import WriterError
 
     log_config = LogConfig(log_dir=args.log_dir, level=args.log_level)
-    command = getattr(args, "_command_line", "organ-masker-lite mask")
+    command = getattr(args, "_command_line", "ome-zarr-masker mask")
     with log_invocation(command, log_config, arguments=_loggable_args(args)) as log:
         try:
             prompts = load_prompt_file(args.prompts)
@@ -168,7 +168,7 @@ def _cmd_mask(args: argparse.Namespace) -> int:
         log.record_config(config.to_record())
         log.record_prompts(prompts, source=args.prompts)
         progress = (
-            (lambda m: print(f"[organ-masker-lite] {m}", file=sys.stderr)) if args.verbose else None
+            (lambda m: print(f"[ome-zarr-masker] {m}", file=sys.stderr)) if args.verbose else None
         )
 
         try:
@@ -217,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     effective_argv = argv if argv is not None else sys.argv[1:]
-    args._command_line = "organ-masker-lite " + " ".join(str(a) for a in effective_argv)
+    args._command_line = "ome-zarr-masker " + " ".join(str(a) for a in effective_argv)
     return args.func(args)
 
 

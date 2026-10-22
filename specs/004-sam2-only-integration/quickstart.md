@@ -16,16 +16,16 @@ Expected: no output (empty). Validates SC-002.
 
 ```sh
 grep -rn "VideoSegmenterBackend\|register_backend\|get_backend\|BackendError\|backends\." src/ tests/
-ls src/organ_masker_lite/backends 2>&1   # expect: No such file or directory
+ls src/ome_zarr_masker/backends 2>&1   # expect: No such file or directory
 ```
 
 Expected: no matches for the first command; the `backends/` directory no longer exists. Validates
-SC-002/SC-003 (5 files collapsed into `src/organ_masker_lite/sam2.py`).
+SC-002/SC-003 (5 files collapsed into `src/ome_zarr_masker/sam2.py`).
 
 ## 3. Confirm the old `--backend` flag is rejected, not silently accepted
 
 ```sh
-organ-masker-lite mask <input.ome.zarr> <out.ome.zarr> --prompts <prompts.json> --backend sam3
+ome-zarr-masker mask <input.ome.zarr> <out.ome.zarr> --prompts <prompts.json> --backend sam3
 echo "exit: $?"
 ```
 
@@ -33,7 +33,7 @@ Expected: non-zero exit, `argparse`'s standard "unrecognized arguments: --backen
 — not a custom "unknown backend" message, since the flag no longer exists at all.
 
 ```python
-from organ_masker_lite import OrganMaskPredictor
+from ome_zarr_masker import OrganMaskPredictor
 OrganMaskPredictor(backend="sam3")  # expect: TypeError: unexpected keyword argument 'backend'
 ```
 
@@ -56,9 +56,9 @@ Expected: no matches — the deterministic stand-in is gone.
 ## 5. Confirm a real SAM2 run still produces the same output as before the refactor (FR-009, SC-004)
 
 ```sh
-organ-masker-lite mask <input.ome.zarr> <out_before.ome.zarr> --prompts <prompts.json>
+ome-zarr-masker mask <input.ome.zarr> <out_before.ome.zarr> --prompts <prompts.json>
 # (after applying this feature's changes, same command — there is no --backend flag anymore)
-organ-masker-lite mask <input.ome.zarr> <out_after.ome.zarr> --prompts <prompts.json>
+ome-zarr-masker mask <input.ome.zarr> <out_after.ome.zarr> --prompts <prompts.json>
 ```
 
 Expected: `out_before.ome.zarr` and `out_after.ome.zarr` are pixel-identical.

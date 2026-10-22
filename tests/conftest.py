@@ -121,7 +121,7 @@ def two_blob_zarr(tmp_path):
 @pytest.fixture(autouse=True)
 def isolate_logs(tmp_path, monkeypatch):
     """Redirect per-invocation input logs (feature 002) to a temp dir, never the repo cwd."""
-    monkeypatch.setenv("ORGAN_MASKER_LOG_DIR", str(tmp_path / "_logs"))
+    monkeypatch.setenv("OME_ZARR_MASKER_LOG_DIR", str(tmp_path / "_logs"))
 
 
 def sam2_available() -> bool:
@@ -134,7 +134,7 @@ def sam2_available() -> bool:
     ``ImportError`` when the dependency is genuinely unusable, so the guard skips rather than
     hard-failing in that case.
     """
-    from organ_masker_lite.sam2 import Sam2Backend
+    from ome_zarr_masker.sam2 import Sam2Backend
 
     try:
         Sam2Backend()

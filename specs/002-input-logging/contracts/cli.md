@@ -2,14 +2,14 @@
 
 **Feature**: 002-input-logging | **Date**: 2026-06-14
 
-Logging applies to all `organ-masker-lite` subcommands (notably `mask` from feature 001). These are
+Logging applies to all `ome-zarr-masker` subcommands (notably `mask` from feature 001). These are
 global options; logging is on by default.
 
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--log-dir PATH` | `./organ_masker_logs` | Directory for per-invocation log files (FR-007); also via env var |
+| `--log-dir PATH` | `./ome_zarr_masker_logs` | Directory for per-invocation log files (FR-007); also via env var |
 | `--log-level LEVEL` | `INFO` | Standard logging level name (`DEBUG`, `INFO`, `WARNING`, `ERROR`); controls ancillary messages only and never drops the core invocation/prompt record (FR-007) |
 
 (No `--no-log` in v1; logging is best-effort and always attempted. A strict/disable mode is out of

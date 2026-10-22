@@ -63,7 +63,7 @@ Point add/select/delete and box add/select/resize/delete MUST come from napari's
 the appearance/rectangle-only constraints from spec.md FR-005/006/007/008.
 
 **Scale/Scope**: Same single-user, single-session scope as the existing interactive session.
-Primarily one file, `src/organ_masker_lite/interactive.py`: the headless core gains box
+Primarily one file, `src/ome_zarr_masker/interactive.py`: the headless core gains box
 bookkeeping and merges each frame's points+box into a single `Prompt` before reaching the
 predictor; `launch()` grows from one points layer to three layers plus the new keybinding/event
 logic. Plus one small, backward-compatible addition to `api.py`: `OrganMaskPredictor.add_prompts`
@@ -124,7 +124,7 @@ specs/006-interactive-prompt-layers/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── api.py                     # changed: OrganMaskPredictor.add_prompts gains an optional `box`
 │                               #          parameter (research R2) so a frame's points+box reach
 │                               #          SAM2 in one call; add_box unchanged, still works alone

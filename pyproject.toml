@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "organ-masker-lite"
+name = "ome-zarr-masker"
 version = "0.0.1"
 description = "Mask organs in OME-Zarr v0.5 volumes with SAM2."
 requires-python = ">=3.11"
@@ -20,10 +20,10 @@ interactive = ["napari"]
 dev = ["pytest", "ruff"]
 
 [project.scripts]
-organ-masker-lite = "organ_masker_lite.cli:main"
+ome-zarr-masker = "ome_zarr_masker.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/organ_masker_lite"]
+packages = ["src/ome_zarr_masker"]
 
 [tool.ruff]
 line-length = 100

@@ -6,7 +6,7 @@
 
 ## Summary
 
-organ-masker-lite masks a 3D structure in a large OME-Zarr v0.5 volume by sweeping the volume as
+ome-zarr-masker masks a 3D structure in a large OME-Zarr v0.5 volume by sweeping the volume as
 stacks of 2D slices and using a SAM-family video predictor to propagate a segmentation from a few
 landmark slices through each sweep, then combining the per-sweep results into one consensus mask.
 Each run targets one structure and emits a single binary mask (FR-021); in multi-axis runs the
@@ -104,7 +104,7 @@ specs/001-ome-zarr-sam-masking/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── __init__.py
 ├── io/
 │   ├── reader.py            # OME-Zarr v0.5 read; multiscale level access; spatial metadata

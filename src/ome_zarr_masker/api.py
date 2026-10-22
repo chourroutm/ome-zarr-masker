@@ -2,7 +2,7 @@
 
 Mirrors the structure of the SAM/SAM2 predictor so SAM users adopt it with minimal learning:
 
-    from organ_masker_lite import OrganMaskPredictor
+    from ome_zarr_masker import OrganMaskPredictor
 
     predictor = OrganMaskPredictor()
     predictor.set_volume("input.ome.zarr", level=3)          # mirrors SAM set_image

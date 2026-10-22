@@ -83,7 +83,7 @@ def validate_ome_zarr(path: str | Path) -> None:
         actual = _describe_actual_version(path)
         if actual is not None:
             raise ValidationError(
-                f"input at {path} is {actual}, but organ-masker-lite requires OME-Zarr v0.5 "
+                f"input at {path} is {actual}, but ome-zarr-masker requires OME-Zarr v0.5 "
                 "(Zarr format 3); convert the store to v0.5 before running this tool"
             ) from exc
         raise ValidationError(f"input is not a valid OME-Zarr v0.5 store: {exc}") from exc

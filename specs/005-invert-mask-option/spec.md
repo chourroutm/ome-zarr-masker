@@ -22,7 +22,7 @@ request the inverted result directly from the `mask` command.
 **Why this priority**: This is the entire feature — there is no smaller
 independently valuable slice.
 
-**Independent Test**: Run `organ-masker mask` twice on the same input, once
+**Independent Test**: Run `ome-zarr-masker mask` twice on the same input, once
 without `--invert` and once with it, and confirm the two output masks are
 exact voxel-wise complements of each other.
 
@@ -77,7 +77,7 @@ exact voxel-wise complements of each other.
   difference.
 - **FR-006**: `--invert` MUST default to off (current mask-in convention
   unchanged unless explicitly requested).
-- **FR-007**: `organ-masker mask --help` MUST describe what `--invert` does
+- **FR-007**: `ome-zarr-masker mask --help` MUST describe what `--invert` does
   in terms a user can act on without consulting external docs.
 - **FR-008**: The `interactive` subcommand's export path MUST remain
   unaffected by this feature; `--invert` is scoped to the `mask` subcommand
@@ -92,7 +92,7 @@ exact voxel-wise complements of each other.
   complements (an XOR of the two is all `1`s).
 - **SC-002**: All existing workflows that do not pass `--invert` produce
   output identical to pre-feature behavior — zero regression.
-- **SC-003**: A user reading only `organ-masker mask --help` can correctly
+- **SC-003**: A user reading only `ome-zarr-masker mask --help` can correctly
   predict what `--invert` will do to their output.
 
 ## Assumptions

@@ -3,7 +3,7 @@
 **Feature**: 003-bundled-ome-zarr-validation
 
 The validation contract is the existing internal interface in
-`src/organ_masker_lite/io/validate.py`. This feature preserves the contract and changes only the
+`src/ome_zarr_masker/io/validate.py`. This feature preserves the contract and changes only the
 implementation (in-process instead of subprocess). Contract IDs are referenced by the quickstart
 and by tasks.
 

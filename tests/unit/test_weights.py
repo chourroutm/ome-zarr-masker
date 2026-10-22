@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from organ_masker_lite.config import RunConfig, default_weight_downloader
+from ome_zarr_masker.config import RunConfig, default_weight_downloader
 
 _URL = "https://example.invalid/weights/model.pt"
 

@@ -10,7 +10,7 @@
 
 ## Overview
 
-organ-masker-lite records, for every masking invocation, the inputs that drove it: the
+ome-zarr-masker records, for every masking invocation, the inputs that drove it: the
 command-line invocation (command, arguments, options, and the resolved effective configuration
 after defaults are applied) and the landmark prompts used (points with labels, optional box, per
 frame/axis), regardless of whether the prompts arrived from a CLI prompt file or the programmatic
@@ -27,7 +27,7 @@ rejected before any output exists, giving a durable trail for troubleshooting ba
 
 - Q: What format should the input log use? → A: Plain text (human-readable; not a structured machine format).
 - Q: How should log entries be organized on disk? → A: One plain-text log file per invocation, named by run identifier/timestamp.
-- Q: Where should the default log location be (overridable)? → A: A logs subdirectory of the current working directory (e.g. `organ_masker_logs/`), gitignored; overridable.
+- Q: Where should the default log location be (overridable)? → A: A logs subdirectory of the current working directory (e.g. `ome_zarr_masker_logs/`), gitignored; overridable.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -136,7 +136,7 @@ run with an overridden destination and a quieter verbosity, and confirm the log 
 - **FR-006**: System MUST write one log file per invocation, named by run identifier/timestamp, so
   invocations stay distinct and no run overwrites another run's log file.
 - **FR-007**: System MUST write logs by default to a logs subdirectory of the current working
-  directory (e.g. `organ_masker_logs/`) and MUST allow the user to override the destination
+  directory (e.g. `ome_zarr_masker_logs/`) and MUST allow the user to override the destination
   directory and the verbosity level.
 - **FR-008**: System MUST keep log output separate from any machine-readable output stream so that
   logging never corrupts the tool's parseable output.
@@ -181,7 +181,7 @@ run with an overridden destination and a quieter verbosity, and confirm the log 
   not replace, the output run-record written alongside successful masks (feature 001, FR-014); the
   run identifier ties the two together.
 - By default each invocation writes its own plain-text log file into a logs subdirectory of the
-  current working directory (e.g. `organ_masker_logs/`), overridable via option/environment. Like
+  current working directory (e.g. `ome_zarr_masker_logs/`), overridable via option/environment. Like
   feature 001's model directory, this default location should be excluded from version control.
 - Logs are plain text and human-readable, not a structured machine format; verbosity is adjustable.
   The exact filename pattern and verbosity levels are finalized in planning.

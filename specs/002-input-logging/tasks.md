@@ -22,7 +22,7 @@ fixture and stub backend.
 
 ## Path Conventions
 
-Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/`.
+Single Python package, `src/` layout: `src/ome_zarr_masker/`, tests in `tests/`.
 
 ---
 
@@ -30,8 +30,8 @@ Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/
 
 **Purpose**: Module placeholder and ignore rules.
 
-- [X] T001 Create the input-logging module skeleton (deliberately NOT named `logging`, to avoid shadowing the stdlib) in `src/organ_masker_lite/input_log.py`
-- [X] T002 [P] Add `organ_masker_logs/` to `.gitignore`
+- [X] T001 Create the input-logging module skeleton (deliberately NOT named `logging`, to avoid shadowing the stdlib) in `src/ome_zarr_masker/input_log.py`
+- [X] T002 [P] Add `ome_zarr_masker_logs/` to `.gitignore`
 
 ---
 
@@ -45,9 +45,9 @@ first.
 
 - [X] T003 [P] Unit test: run identifier is unique and time-sortable (`<UTC-timestamp>-<short-uuid>`) in `tests/unit/test_run_id.py`
 - [X] T004 [P] Unit test: log lifecycle writes a per-invocation file with header + outcome, is best-effort on an unwritable directory (warns to stderr, raises nothing), and writes nothing to stdout, in `tests/unit/test_input_log.py`
-- [X] T005 [P] Implement run identifier generation in `src/organ_masker_lite/input_log.py`
-- [X] T006 [P] Implement `LogConfig` (default `./organ_masker_logs`, verbosity level, enabled flag) in `src/organ_masker_lite/config.py`
-- [X] T007 Implement the per-invocation log lifecycle context manager (create `<log_dir>/<run_id>.log`, write header, append outcome on exit, best-effort wrapping, stderr-only warnings, never stdout) in `src/organ_masker_lite/input_log.py` (depends on T005, T006)
+- [X] T005 [P] Implement run identifier generation in `src/ome_zarr_masker/input_log.py`
+- [X] T006 [P] Implement `LogConfig` (default `./ome_zarr_masker_logs`, verbosity level, enabled flag) in `src/ome_zarr_masker/config.py`
+- [X] T007 Implement the per-invocation log lifecycle context manager (create `<log_dir>/<run_id>.log`, write header, append outcome on exit, best-effort wrapping, stderr-only warnings, never stdout) in `src/ome_zarr_masker/input_log.py` (depends on T005, T006)
 
 **Checkpoint**: Logging mechanism works in isolation with the stub backend.
 
@@ -70,9 +70,9 @@ a log file capturing the command and config.
 
 ### Implementation for User Story 1
 
-- [X] T012 [US1] Record the invocation block (command line, parsed arguments, resolved effective configuration) on entry, before validation, in `src/organ_masker_lite/input_log.py`
-- [X] T013 [US1] Wire the log lifecycle into the CLI entry so every invocation (including failures) is logged, in `src/organ_masker_lite/cli.py`
-- [X] T014 [US1] Embed the run identifier in feature 001's output run-record for log/output correlation (FR-005) in `src/organ_masker_lite/io/writer.py`
+- [X] T012 [US1] Record the invocation block (command line, parsed arguments, resolved effective configuration) on entry, before validation, in `src/ome_zarr_masker/input_log.py`
+- [X] T013 [US1] Wire the log lifecycle into the CLI entry so every invocation (including failures) is logged, in `src/ome_zarr_masker/cli.py`
+- [X] T014 [US1] Embed the run identifier in feature 001's output run-record for log/output correlation (FR-005) in `src/ome_zarr_masker/io/writer.py`
 
 **Checkpoint**: MVP - all CLI invocations, success or failure, are logged; stdout stays clean.
 
@@ -94,8 +94,8 @@ source; run via the API and confirm equivalent logging.
 
 ### Implementation for User Story 2
 
-- [X] T018 [US2] Record the prompts block from the `PromptSet` (full content + count + source) in `src/organ_masker_lite/input_log.py`
-- [X] T019 [US2] Wire the log lifecycle into the API `predict` path (`prompt_source="api"`; expose the run id on the result) in `src/organ_masker_lite/api.py`
+- [X] T018 [US2] Record the prompts block from the `PromptSet` (full content + count + source) in `src/ome_zarr_masker/input_log.py`
+- [X] T019 [US2] Wire the log lifecycle into the API `predict` path (`prompt_source="api"`; expose the run id on the result) in `src/ome_zarr_masker/api.py`
 
 **Checkpoint**: Prompts recoverable from the log for both CLI and API runs.
 
@@ -116,8 +116,8 @@ verbosity are honored.
 
 ### Implementation for User Story 3
 
-- [X] T022 [US3] Add `--log-dir` and `--log-level` CLI options (standard logging level names; default `INFO`) and `log_dir`/`log_level` API parameters in `src/organ_masker_lite/cli.py` and `src/organ_masker_lite/api.py`
-- [X] T023 [US3] Ensure lower verbosity never drops the core invocation/prompt record needed for reproducibility, in `src/organ_masker_lite/input_log.py`
+- [X] T022 [US3] Add `--log-dir` and `--log-level` CLI options (standard logging level names; default `INFO`) and `log_dir`/`log_level` API parameters in `src/ome_zarr_masker/cli.py` and `src/ome_zarr_masker/api.py`
+- [X] T023 [US3] Ensure lower verbosity never drops the core invocation/prompt record needed for reproducibility, in `src/ome_zarr_masker/input_log.py`
 
 **Checkpoint**: Destination and verbosity configurable; logging never corrupts stdout.
 
@@ -127,7 +127,7 @@ verbosity are honored.
 
 - [X] T024 [P] Performance test: logging adds < 50 ms per invocation and does not scale with volume size, in `tests/performance/test_log_overhead.py`
 - [X] T025 [P] Update `README.md`/docs with logging behavior and the `--log-dir`/`--log-level` options
-- [X] T026 [P] Type-hint/docstring pass and `ruff`/`ruff format` clean across `src/organ_masker_lite/input_log.py` and touched files
+- [X] T026 [P] Type-hint/docstring pass and `ruff`/`ruff format` clean across `src/ome_zarr_masker/input_log.py` and touched files
 - [X] T027 Execute the `quickstart.md` scenarios end-to-end as a final validation pass
 
 ---
@@ -165,8 +165,8 @@ verbosity are honored.
 Task: "Unit test for run identifier in tests/unit/test_run_id.py"
 Task: "Unit test for log lifecycle in tests/unit/test_input_log.py"
 # Then implement in parallel where files differ:
-Task: "Implement run id in src/organ_masker_lite/input_log.py"
-Task: "Implement LogConfig in src/organ_masker_lite/config.py"
+Task: "Implement run id in src/ome_zarr_masker/input_log.py"
+Task: "Implement LogConfig in src/ome_zarr_masker/config.py"
 ```
 
 ## Implementation Strategy

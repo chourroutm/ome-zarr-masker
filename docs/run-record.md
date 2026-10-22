@@ -1,6 +1,6 @@
 # Run record (reproducibility)
 
-Every mask written by organ-masker-lite embeds a `run_record.json` at the root of the output
+Every mask written by ome-zarr-masker embeds a `run_record.json` at the root of the output
 OME-Zarr v0.5 store. It captures the full, reproducible parameterization of the run -- the input,
 the level, the configuration, and the prompts -- so a result can be audited and re-created
 (FR-014). The CLI, the Python API, and the interactive session all write the same record, because
@@ -30,7 +30,7 @@ output.ome.zarr/
 | `config.postprocess.fill_holes` | bool | Whether interior holes were filled (default `true`). |
 | `config.postprocess.dilation_radius` | int | Dilation iterations applied (default `0`). |
 | `config.postprocess.erosion_radius` | int | Erosion iterations applied (default `0`). |
-| `config.model_dir` | string | Resolved weights directory (explicit > `ORGAN_MASKER_MODEL_DIR` > `./organ_masker_models`). |
+| `config.model_dir` | string | Resolved weights directory (explicit > `OME_ZARR_MASKER_MODEL_DIR` > `./ome_zarr_masker_models`). |
 | `config.allow_download` | bool | Whether missing weights may be auto-downloaded. |
 | `prompts.level` | int | Pyramid level the prompt coordinates were authored at (they were converted to `level` for the run). |
 | `prompts.objects` | list | One entry per prompt: `obj_id`, `frame_index`, `points` (`xy` in `(x, y)`, `label` 1=positive/0=negative), and `box` (`[x0, y0, x1, y1]` or `null`), in authoring-level coordinates. |
@@ -41,7 +41,7 @@ output.ome.zarr/
 Produced by:
 
 ```bash
-organ-masker-lite mask input.ome.zarr output.ome.zarr \
+ome-zarr-masker mask input.ome.zarr output.ome.zarr \
   --prompts prompts.json --level 0 --axes z,y --combine majority
 ```
 
@@ -61,7 +61,7 @@ organ-masker-lite mask input.ome.zarr output.ome.zarr \
       "dilation_radius": 0,
       "erosion_radius": 0
     },
-    "model_dir": "/data/organ_masker_models",
+    "model_dir": "/data/ome_zarr_masker_models",
     "allow_download": true
   },
   "prompts": {

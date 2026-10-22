@@ -8,18 +8,18 @@ from __future__ import annotations
 
 import pytest
 
-from organ_masker_lite.config import LogConfig
-from organ_masker_lite.input_log import log_invocation
+from ome_zarr_masker.config import LogConfig
+from ome_zarr_masker.input_log import log_invocation
 
 
 def test_writes_header_and_success_outcome(tmp_path):
     cfg = LogConfig(log_dir=tmp_path / "logs")
-    with log_invocation("organ-masker-lite mask in out", cfg, arguments={"backend": "stub"}) as log:
+    with log_invocation("ome-zarr-masker mask in out", cfg, arguments={"backend": "stub"}) as log:
         run_id = log.run_id
         path = log.path
     text = path.read_text()
     assert f"run_id: {run_id}" in text
-    assert "command: organ-masker-lite mask in out" in text
+    assert "command: ome-zarr-masker mask in out" in text
     assert "backend: stub" in text
     assert "outcome: succeeded" in text
 

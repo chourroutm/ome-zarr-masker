@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from organ_masker_lite.config import LogConfig
-from organ_masker_lite.input_log import log_invocation
-from organ_masker_lite.prompts.model import Prompt, PromptSet
+from ome_zarr_masker.config import LogConfig
+from ome_zarr_masker.input_log import log_invocation
+from ome_zarr_masker.prompts.model import Prompt, PromptSet
 
 
 def test_large_prompt_set_recorded_in_full(tmp_path):

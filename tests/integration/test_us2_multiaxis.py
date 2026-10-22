@@ -10,10 +10,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from organ_masker_lite.config import RunConfig
-from organ_masker_lite.engine.pipeline import run_masking
-from organ_masker_lite.io.reader import OmeZarrReader
-from organ_masker_lite.prompts.model import Prompt, PromptSet
+from ome_zarr_masker.config import RunConfig
+from ome_zarr_masker.engine.pipeline import run_masking
+from ome_zarr_masker.io.reader import OmeZarrReader
+from ome_zarr_masker.prompts.model import Prompt, PromptSet
 
 from ..conftest import sam2_available
 

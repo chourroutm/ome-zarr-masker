@@ -1,4 +1,4 @@
-"""organ-masker-lite: mask organs in OME-Zarr v0.5 volumes with SAM2."""
+"""ome-zarr-masker: mask organs in OME-Zarr v0.5 volumes with SAM2."""
 
 from .api import MaskResult, OrganMaskPredictor
 from .config import PostProcessConfig, RunConfig

@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from organ_masker_lite.config import MODEL_DIR_ENV, PostProcessConfig, RunConfig
+from ome_zarr_masker.config import MODEL_DIR_ENV, PostProcessConfig, RunConfig
 
 
 def test_default_model_dir_is_cwd_subdir(tmp_path, monkeypatch):
     monkeypatch.delenv(MODEL_DIR_ENV, raising=False)
     monkeypatch.chdir(tmp_path)
     cfg = RunConfig()
-    assert cfg.resolved_model_dir() == tmp_path / "organ_masker_models"
+    assert cfg.resolved_model_dir() == tmp_path / "ome_zarr_masker_models"
 
 
 def test_env_overrides_default(tmp_path, monkeypatch):

@@ -30,23 +30,23 @@ committed as a permanent test, consistent with this project's established GUI-te
 
 ## Path Conventions
 
-Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/`.
+Single Python package, `src/` layout: `src/ome_zarr_masker/`, tests in `tests/`.
 
 ---
 
 ## Phase 1: Foundational (blocking prerequisite for both stories)
 
 - [X] T001 Add `box: np.ndarray | None = None` (keyword-only) to
-      `OrganMaskPredictor.add_prompts` in `src/organ_masker_lite/api.py`, threaded into the single
+      `OrganMaskPredictor.add_prompts` in `src/ome_zarr_masker/api.py`, threaded into the single
       `Prompt` it constructs; `add_box` unchanged (research R2)
 - [X] T002 Update `test_c_api_7_argument_names_and_shapes_match_sam2` in
       `tests/contract/test_python_api.py` for `add_prompts`'s new `box` parameter (caught as a
       regression when the fast suite was re-run after T001)
 - [X] T003 Add `_boxes: dict[int, np.ndarray]` state plus `add_box`/`clear_boxes` methods to
-      `InteractiveSession` in `src/organ_masker_lite/interactive.py` (data-model.md)
+      `InteractiveSession` in `src/ome_zarr_masker/interactive.py` (data-model.md)
 - [X] T004 Rewrite `InteractiveSession.preview()`'s prompt-building loop to iterate the union of
       frames-with-points and frames-with-a-box, calling `add_prompts(..., box=...)` once per frame
-      (research R2) in `src/organ_masker_lite/interactive.py`
+      (research R2) in `src/ome_zarr_masker/interactive.py`
 
 **Tests** (fast, GPU-free):
 

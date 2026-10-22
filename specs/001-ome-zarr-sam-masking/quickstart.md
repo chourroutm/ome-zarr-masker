@@ -17,14 +17,14 @@ not duplicated (see [contracts/](./contracts/) and [data-model.md](./data-model.
   validator command needs to be on PATH (feature 003).
 - A small OME-Zarr v0.5 input store. Tests generate a synthetic one (see Test Data below); for
   manual runs, point at any v0.5 multiscale store.
-- For real backends: a CUDA GPU is recommended; weights auto-download into `./organ_masker_models`
+- For real backends: a CUDA GPU is recommended; weights auto-download into `./ome_zarr_masker_models`
   on first run (use `--no-download` with pre-placed weights for offline/air-gapped use).
 
 ## Validate the environment
 
 ```bash
-organ-masker-lite --help
-# Input validation runs in-process when you invoke `organ-masker-lite mask`; no separate
+ome-zarr-masker --help
+# Input validation runs in-process when you invoke `ome-zarr-masker mask`; no separate
 # validator command is required.
 ```
 
@@ -37,7 +37,7 @@ cat > prompts.json <<'JSON'
 {"objects":[{"obj_id":0,"points":[{"frame":120,"xy":[340,512],"label":1}]}]}
 JSON
 
-organ-masker-lite mask input.ome.zarr output.ome.zarr \
+ome-zarr-masker mask input.ome.zarr output.ome.zarr \
   --prompts prompts.json --backend sam2 --level 3 --axes z --direction forward
 ```
 
@@ -54,7 +54,7 @@ cat > box.json <<'JSON'
 {"objects":[{"obj_id":0,"box":{"frame":120,"xyxy":[300,480,380,560]}}]}
 JSON
 
-organ-masker-lite mask input.ome.zarr out_box.ome.zarr --prompts box.json --level 3 --axes z
+ome-zarr-masker mask input.ome.zarr out_box.ome.zarr --prompts box.json --level 3 --axes z
 ```
 
 Expected: foreground lies predominantly within the box on the prompt frame. (C-CLI-2)
@@ -69,7 +69,7 @@ cat > exclude.json <<'JSON'
 ]}]}
 JSON
 
-organ-masker-lite mask input.ome.zarr out_excl.ome.zarr --prompts exclude.json --level 3 --axes z
+ome-zarr-masker mask input.ome.zarr out_excl.ome.zarr --prompts exclude.json --level 3 --axes z
 ```
 
 Expected: the region around the negative (label 0) point is excluded from the foreground. (C-CLI-3)
@@ -77,7 +77,7 @@ Expected: the region around the negative (label 0) point is excluded from the fo
 ## Scenario 4 — Python API parity (US4)
 
 ```python
-from organ_masker_lite import OrganMaskPredictor
+from ome_zarr_masker import OrganMaskPredictor
 
 p = OrganMaskPredictor(backend="sam2")
 p.set_volume("input.ome.zarr", level=3)
@@ -90,7 +90,7 @@ Expected: `api_out.ome.zarr` equals the Scenario 1 CLI output for identical inpu
 ## Scenario 5 — Multi-axis, forward+reverse (US2)
 
 ```bash
-organ-masker-lite mask input.ome.zarr out_multi.ome.zarr --prompts prompts.json \
+ome-zarr-masker mask input.ome.zarr out_multi.ome.zarr --prompts prompts.json \
   --axes z,y,x --direction forward_reverse --combine majority
 ```
 
@@ -100,8 +100,8 @@ Expected: consensus mask agreement >= the single-axis forward-only result with t
 ## Scenario 6 — Backend comparison (SAM2 vs SAM3, US partial)
 
 ```bash
-organ-masker-lite mask input.ome.zarr out_sam2.ome.zarr --prompts prompts.json --backend sam2
-organ-masker-lite mask input.ome.zarr out_sam3.ome.zarr --prompts prompts.json --backend sam3
+ome-zarr-masker mask input.ome.zarr out_sam2.ome.zarr --prompts prompts.json --backend sam2
+ome-zarr-masker mask input.ome.zarr out_sam3.ome.zarr --prompts prompts.json --backend sam3
 ```
 
 Expected: identical inputs/prompts, only the backend differs; both produce valid masks for
@@ -110,9 +110,9 @@ like-for-like comparison. (SC-010)
 ## Scenario 7 — Error handling (SC-009)
 
 ```bash
-organ-masker-lite mask not_a_zarr output.ome.zarr --prompts prompts.json   # invalid input
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts empty.json # no positive prompt
-organ-masker-lite mask input.ome.zarr output.ome.zarr --prompts prompts.json --level 999  # bad level
+ome-zarr-masker mask not_a_zarr output.ome.zarr --prompts prompts.json   # invalid input
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts empty.json # no positive prompt
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json --level 999  # bad level
 ```
 
 Expected: each exits non-zero with a clear message; no partial `output.ome.zarr` is created.

@@ -5,7 +5,7 @@ Fast and GPU-free/display-free: these exercise plain Python/logic, not napari's 
 
 from __future__ import annotations
 
-from organ_masker_lite.interactive import _clip_window, _PreviewBusyGuard
+from ome_zarr_masker.interactive import _clip_window, _PreviewBusyGuard
 
 
 def test_try_start_succeeds_when_idle_and_marks_busy():

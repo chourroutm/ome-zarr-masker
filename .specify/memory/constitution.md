@@ -29,7 +29,7 @@ Follow-up TODOs: none
 governing principles (I. Code Quality Standards, II. Test Discipline, III. Disciplined
 Version Control) plus Quality Gates, Development Workflow, and Governance sections.
 -->
-# OrganMasker Lite Constitution
+# OME-Zarr Masker Constitution
 
 ## Core Principles
 

@@ -23,7 +23,7 @@ introduced. The relevant entities from the spec:
 
 ## Validation dependency
 
-- **What**: The OME-Zarr metadata/validation capability organ-masker-lite relies on, now consumed
+- **What**: The OME-Zarr metadata/validation capability ome-zarr-masker relies on, now consumed
   in-process from the installed `ome-zarr-models` package (with `zarr>=3`).
 - **Fields / declaration**: Declared in `pyproject.toml` as `ome-zarr-models>=1.6` (a minimum
   compatible floor for reproducible behavior — FR-007). No new dependency added.

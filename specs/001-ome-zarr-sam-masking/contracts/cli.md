@@ -2,15 +2,15 @@
 
 **Feature**: 001-ome-zarr-sam-masking | **Date**: 2026-06-14
 
-One-shot, non-interactive CLI (FR-008) built on stdlib `argparse`. Invoked as `organ-masker-lite`
-(console script) or `python -m organ_masker_lite`.
+One-shot, non-interactive CLI (FR-008) built on stdlib `argparse`. Invoked as `ome-zarr-masker`
+(console script) or `python -m ome_zarr_masker`.
 
-## `organ-masker-lite mask`
+## `ome-zarr-masker mask`
 
 Run end-to-end masking from an input volume and a prompt file to an OME-Zarr v0.5 mask.
 
 ```
-organ-masker-lite mask INPUT OUTPUT --prompts PROMPTS [options]
+ome-zarr-masker mask INPUT OUTPUT --prompts PROMPTS [options]
 ```
 
 ### Arguments
@@ -28,7 +28,7 @@ organ-masker-lite mask INPUT OUTPUT --prompts PROMPTS [options]
 | `--fill-holes / --no-fill-holes` | no | on | Hole filling (FR-012) |
 | `--dilate INT` | no | `0` | Dilation radius (FR-012) |
 | `--erode INT` | no | `0` | Erosion radius (FR-012) |
-| `--model-dir PATH` | no | `./organ_masker_models` (or env) | Weights directory (FR-019) |
+| `--model-dir PATH` | no | `./ome_zarr_masker_models` (or env) | Weights directory (FR-019) |
 | `--no-download` | no | download on | Disable weight auto-download (FR-020) |
 | `--overwrite` | no | off | Allow overwriting existing OUTPUT (FR-013) |
 | `--workers INT` | no | automatic | Output shards written in parallel, ≥ 1 (feature 009; see `specs/009-scalable-mask-writer/contracts/cli.md`) |
@@ -69,7 +69,7 @@ A small text format (JSON) listing prompts; mirrors the API convention:
 - On error, no partial OUTPUT store is left behind (FR-013).
 - The run parameters and prompts are recorded alongside OUTPUT (FR-014).
 
-## `organ-masker-lite interactive` (P4)
+## `ome-zarr-masker interactive` (P4)
 
 Launches the napari session (requires the `[interactive]` extra). Shares the same engine and writes
 the same OME-Zarr v0.5 output on export (FR-009, FR-011).

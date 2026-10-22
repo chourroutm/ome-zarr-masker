@@ -99,7 +99,7 @@ specs/005-invert-mask-option/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── config.py                  # changed: PostProcessConfig gains `invert: bool = False`;
 │                               #          is_noop and RunConfig.to_record() updated
 ├── postprocess/

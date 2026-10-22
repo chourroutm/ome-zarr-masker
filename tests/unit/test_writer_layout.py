@@ -8,8 +8,8 @@ import re
 import numpy as np
 import pytest
 
-from organ_masker_lite.io import writer
-from organ_masker_lite.io.writer import (
+from ome_zarr_masker.io import writer
+from ome_zarr_masker.io.writer import (
     LevelLayout,
     _array_spec,
     _default_layout,
@@ -91,28 +91,28 @@ def _layout(shards):
 def test_resolve_workers_budget_derived_by_default():
     import os
 
-    from organ_masker_lite.io.writer import resolve_workers
+    from ome_zarr_masker.io.writer import resolve_workers
 
     lay = _layout((1024, 1024, 1024))  # 1 GiB shard -> 8 GiB / 2 GiB per worker = 4
     assert resolve_workers(None, lay) == max(1, min(os.cpu_count() or 1, 4))
 
 
 def test_resolve_workers_user_value_wins():
-    from organ_masker_lite.io.writer import resolve_workers
+    from ome_zarr_masker.io.writer import resolve_workers
 
     assert resolve_workers(3, _layout((1024, 1024, 1024))) == 3
 
 
 @pytest.mark.parametrize("bad", [0, -1, 1.5, "2", True])
 def test_resolve_workers_rejects_invalid(bad):
-    from organ_masker_lite.io.writer import WriterError, resolve_workers
+    from ome_zarr_masker.io.writer import WriterError, resolve_workers
 
     with pytest.raises(WriterError):
         resolve_workers(bad, _layout((64, 64, 64)))
 
 
 def test_resolve_workers_oversized_shard_falls_back_to_one_with_warning(monkeypatch):
-    from organ_masker_lite.io.writer import resolve_workers
+    from ome_zarr_masker.io.writer import resolve_workers
 
     monkeypatch.setattr(writer, "WRITE_BUDGET_BYTES", 2**20)
     with pytest.warns(UserWarning, match="budget"):
@@ -123,7 +123,7 @@ def test_resolve_workers_oversized_shard_falls_back_to_one_with_warning(monkeypa
 
 
 def _small_reader(tmp_path, shape=(8, 16, 16), n_levels=3):
-    from organ_masker_lite.io.reader import OmeZarrReader
+    from ome_zarr_masker.io.reader import OmeZarrReader
 
     from ..conftest import write_ome_zarr
 
@@ -133,7 +133,7 @@ def _small_reader(tmp_path, shape=(8, 16, 16), n_levels=3):
 
 
 def test_invalid_workers_rejected_before_anything_is_written(tmp_path):
-    from organ_masker_lite.io.writer import WriterError, write_mask
+    from ome_zarr_masker.io.writer import WriterError, write_mask
 
     reader = _small_reader(tmp_path)
     out = tmp_path / "out.ome.zarr"
@@ -147,7 +147,7 @@ def test_concurrent_shards_never_exceed_workers(tmp_path, monkeypatch):
     import threading
     import time
 
-    from organ_masker_lite.io.writer import write_mask
+    from ome_zarr_masker.io.writer import write_mask
 
     monkeypatch.setattr(writer, "DEFAULT_CHUNKS", (4, 4, 4))
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 4)
@@ -185,7 +185,7 @@ _LEVEL_START = re.compile(r"writing level (\d+) .* (\d+) shards .* workers=(\d+)
 
 
 def _write_with_progress(tmp_path, monkeypatch, workers):
-    from organ_masker_lite.io.writer import write_mask
+    from ome_zarr_masker.io.writer import write_mask
 
     monkeypatch.setattr(writer, "DEFAULT_CHUNKS", (4, 4, 4))
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 4)
@@ -241,7 +241,7 @@ def test_progress_reports_user_worker_count(tmp_path, monkeypatch):
 def test_run_record_has_output_layout_without_worker_count(tmp_path):
     import json
 
-    from organ_masker_lite.io.writer import write_mask
+    from ome_zarr_masker.io.writer import write_mask
 
     records = []
     for workers in (1, 4):
@@ -273,7 +273,7 @@ def test_run_record_has_output_layout_without_worker_count(tmp_path):
 
 
 def test_shards_with_no_foreground_are_never_built(tmp_path, monkeypatch):
-    from organ_masker_lite.io.writer import write_mask
+    from ome_zarr_masker.io.writer import write_mask
 
     monkeypatch.setattr(writer, "DEFAULT_CHUNKS", (4, 4, 4))
     monkeypatch.setattr(writer, "DEFAULT_MAX_SHARD", 4)
@@ -302,8 +302,8 @@ def test_shards_with_no_foreground_are_never_built(tmp_path, monkeypatch):
 
 
 def test_plan_layouts_copies_sharded_input(tmp_path):
-    from organ_masker_lite.io.reader import OmeZarrReader
-    from organ_masker_lite.io.writer import plan_layouts, write_mask
+    from ome_zarr_masker.io.reader import OmeZarrReader
+    from ome_zarr_masker.io.writer import plan_layouts, write_mask
 
     from ..conftest import assert_ome_zarr_models_valid, write_ome_zarr
 
@@ -328,7 +328,7 @@ def test_plan_layouts_copies_sharded_input(tmp_path):
 
 
 def test_plan_layouts_uses_default_for_unsharded_input(tmp_path):
-    from organ_masker_lite.io.writer import _default_layout, plan_layouts
+    from ome_zarr_masker.io.writer import _default_layout, plan_layouts
 
     reader = _small_reader(tmp_path)  # unsharded, single chunk per level
     for lay in plan_layouts(reader):

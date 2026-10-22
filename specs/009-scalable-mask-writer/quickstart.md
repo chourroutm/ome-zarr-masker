@@ -49,9 +49,9 @@ Expected:
 ## 5. CLI end to end (C-W-CLI-1..5)
 
 ```sh
-organ-masker-lite mask in.ome.zarr out.ome.zarr --prompts p.json --level 1 --verbose
-organ-masker-lite mask in.ome.zarr out2.ome.zarr --prompts p.json --level 1 --workers 2
-organ-masker-lite mask in.ome.zarr out3.ome.zarr --prompts p.json --level 1 --workers 0; echo $?
+ome-zarr-masker mask in.ome.zarr out.ome.zarr --prompts p.json --level 1 --verbose
+ome-zarr-masker mask in.ome.zarr out2.ome.zarr --prompts p.json --level 1 --workers 2
+ome-zarr-masker mask in.ome.zarr out3.ome.zarr --prompts p.json --level 1 --workers 0; echo $?
 ```
 
 Expected:

@@ -2,7 +2,7 @@
 
 No new domain entity or on-disk schema change. One new config field, plus in-memory UI state.
 
-## `RunConfig` (`src/organ_masker_lite/config.py`)
+## `RunConfig` (`src/ome_zarr_masker/config.py`)
 
 New field:
 

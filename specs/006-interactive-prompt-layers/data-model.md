@@ -3,7 +3,7 @@
 No new domain entity or on-disk schema change. This feature restructures in-memory prompt
 bookkeeping inside `InteractiveSession` and adds three napari view layers over it.
 
-## `InteractiveSession` headless core (`src/organ_masker_lite/interactive.py`)
+## `InteractiveSession` headless core (`src/ome_zarr_masker/interactive.py`)
 
 Existing state (unchanged in shape):
 
@@ -32,7 +32,7 @@ New/changed methods:
   A frame with only a box and no points calls `add_prompts` with empty `coords`/`labels` arrays and
   the box, which is already valid input (mirrors `add_box`'s existing empty-points construction).
 
-## `OrganMaskPredictor` (`src/organ_masker_lite/api.py`)
+## `OrganMaskPredictor` (`src/ome_zarr_masker/api.py`)
 
 - **`add_prompts(frame_index, point_coords, point_labels, obj_id=0, *, box=None)`** (changed): new
   optional keyword-only `box` parameter, threaded into the single `Prompt` this method already

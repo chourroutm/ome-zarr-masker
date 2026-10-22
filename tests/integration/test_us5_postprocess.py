@@ -16,8 +16,8 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from organ_masker_lite.cli import main
-from organ_masker_lite.io.reader import OmeZarrReader
+from ome_zarr_masker.cli import main
+from ome_zarr_masker.io.reader import OmeZarrReader
 
 from ..conftest import sam2_available, write_ome_zarr
 

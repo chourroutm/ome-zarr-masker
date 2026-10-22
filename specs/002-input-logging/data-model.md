@@ -24,7 +24,7 @@ Logging configuration for a run (lives with feature 001's `RunConfig`).
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `log_dir` | path | `./organ_masker_logs` | Override via `--log-dir`/env (FR-007) |
+| `log_dir` | path | `./ome_zarr_masker_logs` | Override via `--log-dir`/env (FR-007) |
 | `level` | stdlib level name | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`; controls ancillary messages only (FR-007, R7) |
 | `enabled` | bool | `true` | Logging on by default |
 

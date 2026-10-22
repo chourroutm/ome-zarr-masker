@@ -23,7 +23,7 @@ Tests reuse feature 001's synthetic OME-Zarr fixture (`tests/conftest.py::write_
 
 ## Path Conventions
 
-Single Python package, `src/` layout: `src/organ_masker_lite/`, tests in `tests/`.
+Single Python package, `src/` layout: `src/ome_zarr_masker/`, tests in `tests/`.
 
 ---
 
@@ -56,7 +56,7 @@ synthetic OME-Zarr v0.5 store (passes) and an invalid/missing store (rejected) â
 
 ### Implementation for User Story 1
 
-- [X] T005 [US1] Rewrite `src/organ_masker_lite/io/validate.py` to validate in-process: keep the missing-path check, then call `ome_zarr_models.open_ome_zarr(path, version="0.5")` inside `warnings.catch_warnings(action="error", category=ValidationWarning)`, mapping any failure to `ValidationError("input is not a valid OME-Zarr v0.5 store: ...")` and a failed `import ome_zarr_models` to an actionable `ValidationError` (FR-005); remove the `subprocess`/`shutil.which`/interpreter-adjacent path probing. Existing valid/invalid/missing tests in `tests/unit/test_validate.py` MUST stay green (C-VAL-3, C-VAL-4, C-VAL-6) (depends on T002, T003, T004)
+- [X] T005 [US1] Rewrite `src/ome_zarr_masker/io/validate.py` to validate in-process: keep the missing-path check, then call `ome_zarr_models.open_ome_zarr(path, version="0.5")` inside `warnings.catch_warnings(action="error", category=ValidationWarning)`, mapping any failure to `ValidationError("input is not a valid OME-Zarr v0.5 store: ...")` and a failed `import ome_zarr_models` to an actionable `ValidationError` (FR-005); remove the `subprocess`/`shutil.which`/interpreter-adjacent path probing. Existing valid/invalid/missing tests in `tests/unit/test_validate.py` MUST stay green (C-VAL-3, C-VAL-4, C-VAL-6) (depends on T002, T003, T004)
 
 **Checkpoint**: Validation works from a plain install with no `PATH` prerequisite; the full existing
 suite is green. This is the MVP and independently shippable.

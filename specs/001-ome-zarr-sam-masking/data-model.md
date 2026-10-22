@@ -83,7 +83,7 @@ The complete, reproducible parameterization of a run (FR-014).
 | `direction` | enum {`forward`,`forward_reverse`} | `forward` | Propagation mode (FR-006) |
 | `combine_rule` | enum {`majority`,`union`,`intersection`} | `majority` | Consensus rule (FR-007) |
 | `postprocess` | PostProcessConfig | see below | Optional cleanup (FR-012) |
-| `model_dir` | path | `./organ_masker_models` | Override via option/env (FR-019) |
+| `model_dir` | path | `./ome_zarr_masker_models` | Override via option/env (FR-019) |
 | `allow_download` | bool | `true` | `--no-download` sets false (FR-020); download is performed by an injectable fetcher so the path is unit-testable without network |
 | `overwrite` | bool | `false` | Guards existing output (FR-013) |
 

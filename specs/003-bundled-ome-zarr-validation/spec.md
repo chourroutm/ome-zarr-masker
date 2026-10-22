@@ -12,7 +12,7 @@
 
 ### User Story 1 - Validate inputs after a plain install (Priority: P1)
 
-A user installs organ-masker-lite into a clean environment and immediately runs a masking
+A user installs ome-zarr-masker into a clean environment and immediately runs a masking
 operation on a valid OME-Zarr v0.5 store. Input validation runs successfully without the user
 having to install anything else or arrange for any separate validator command to be reachable on
 their system path.
@@ -28,7 +28,7 @@ additional environment setup.
 
 **Acceptance Scenarios**:
 
-1. **Given** a clean environment with only organ-masker-lite installed, **When** the user runs a
+1. **Given** a clean environment with only ome-zarr-masker installed, **When** the user runs a
    masking operation on a valid OME-Zarr v0.5 store, **Then** input validation passes and the run
    proceeds.
 2. **Given** the same environment with no `ome-zarr-models` validator command reachable on `PATH`,
@@ -64,7 +64,7 @@ included with the package.
 ### User Story 3 - Predictable validation regardless of environment (Priority: P3)
 
 A user has an unrelated or differently-versioned `ome-zarr-models` command already present on their
-system path. Running organ-masker-lite still validates inputs using the version bundled with the
+system path. Running ome-zarr-masker still validates inputs using the version bundled with the
 package, so behavior is consistent and reproducible.
 
 **Why this priority**: Removes a subtle source of inconsistent results between machines. Valuable
@@ -96,7 +96,7 @@ rather than the on-`PATH` command.
 
 ### Functional Requirements
 
-- **FR-001**: Installing organ-masker-lite MUST bring in everything required to validate OME-Zarr
+- **FR-001**: Installing ome-zarr-masker MUST bring in everything required to validate OME-Zarr
   v0.5 inputs, with no separate installation step and no requirement to place or verify a validator
   command on the system `PATH`.
 - **FR-002**: Input validation MUST succeed or fail based solely on the package's declared
@@ -117,7 +117,7 @@ rather than the on-`PATH` command.
 
 - **OME-Zarr v0.5 store**: The input volume the user wants to mask; must be validated as a
   conformant OME-Zarr v0.5 store before any masking work begins.
-- **Validation dependency**: The bundled OME-Zarr metadata/validation capability that organ-masker-lite
+- **Validation dependency**: The bundled OME-Zarr metadata/validation capability that ome-zarr-masker
   relies on; declared as a package dependency with a minimum compatible version.
 
 ## Success Criteria *(mandatory)*

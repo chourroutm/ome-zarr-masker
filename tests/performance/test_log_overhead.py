@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 
-from organ_masker_lite.config import LogConfig
-from organ_masker_lite.input_log import log_invocation
-from organ_masker_lite.prompts.model import Prompt, PromptSet
+from ome_zarr_masker.config import LogConfig
+from ome_zarr_masker.input_log import log_invocation
+from ome_zarr_masker.prompts.model import Prompt, PromptSet
 
 BUDGET_S = 0.050
 
@@ -17,7 +17,7 @@ def _time_one(tmp_path, level_shape):
     config = {"backend": "stub", "level": 0, "level_shape": list(level_shape)}
     cfg = LogConfig(log_dir=tmp_path)
     start = time.perf_counter()
-    with log_invocation("organ-masker-lite mask in out", cfg, arguments={"backend": "stub"}) as log:
+    with log_invocation("ome-zarr-masker mask in out", cfg, arguments={"backend": "stub"}) as log:
         log.record_config(config)
         log.record_prompts(prompts, source="file")
     return time.perf_counter() - start

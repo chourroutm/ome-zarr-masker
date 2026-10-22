@@ -1,12 +1,17 @@
-# organ-masker-lite
+# ome-zarr-masker
 
 Mask organs in OME-Zarr v0.5 volumes with SAM2. Place a few landmarks on a single plane, and
-organ-masker-lite propagates them across the volume -- treating each axis sweep as a "video" of
+ome-zarr-masker propagates them across the volume -- treating each axis sweep as a "video" of
 slices for SAM2 -- and writes a single binary OME-Zarr v0.5 mask whose pyramid matches the input's
 levels.
 
 Three entry points share one engine (CLI, Python API, interactive napari session), so they produce
 identical results for identical inputs.
+
+> Formerly `organ-masker-lite`. The package (`ome_zarr_masker`), command (`ome-zarr-masker`),
+> environment variables (`OME_ZARR_MASKER_*`) and default directories (`./ome_zarr_masker_models`,
+> `./ome_zarr_masker_logs`) were renamed; move existing `./organ_masker_models` weights to the new
+> directory (or pass `--model-dir`) to avoid re-downloading them.
 
 ## Features
 
@@ -35,14 +40,14 @@ pip install -e ".[dev]"                  # tests + linting
 
 OME-Zarr v0.5 input validation is provided by the bundled `ome-zarr-models` dependency and runs
 in-process, so a plain install is enough -- no validator command needs to be on your `PATH`. A CUDA
-GPU (>= 8 GB) is recommended; weights auto-download into `./organ_masker_models` on first use
-(override with `--model-dir` / `ORGAN_MASKER_MODEL_DIR`, or use `--no-download` with pre-placed
+GPU (>= 8 GB) is recommended; weights auto-download into `./ome_zarr_masker_models` on first use
+(override with `--model-dir` / `OME_ZARR_MASKER_MODEL_DIR`, or use `--no-download` with pre-placed
 weights for offline use).
 
 ## CLI
 
 ```bash
-organ-masker-lite mask INPUT OUTPUT --prompts PROMPTS [options]
+ome-zarr-masker mask INPUT OUTPUT --prompts PROMPTS [options]
 ```
 
 Single positive point:
@@ -52,7 +57,7 @@ cat > prompts.json <<'JSON'
 {"level":3,"objects":[{"obj_id":0,"points":[{"frame":120,"xy":[340,512],"label":1}]}]}
 JSON
 
-organ-masker-lite mask input.ome.zarr output.ome.zarr \
+ome-zarr-masker mask input.ome.zarr output.ome.zarr \
   --prompts prompts.json --level 3 --axes z --direction forward
 ```
 
@@ -68,7 +73,7 @@ Key options:
 | `--dilate INT` / `--erode INT` | `0` | Morphology radii (voxels). |
 | `--overwrite` | off | Replace an existing output. |
 | `--workers INT` | automatic | Output shards written in parallel (default: as many as fit in an 8 GiB write budget, at most the CPU count). |
-| `--log-dir PATH` | `./organ_masker_logs` | Directory for per-invocation input logs. |
+| `--log-dir PATH` | `./ome_zarr_masker_logs` | Directory for per-invocation input logs. |
 | `--log-level {DEBUG,INFO,WARNING,ERROR}` | `INFO` | Verbosity of ancillary log messages. |
 
 ### Prompt file
@@ -116,8 +121,8 @@ The log is written before validation, so runs that fail before producing output 
 with an `outcome:` line on exit. The log's `run_id` matches the `run_id` embedded in the output's
 `run_record.json`, correlating each log with its mask.
 
-The default directory is `./organ_masker_logs` (override with `--log-dir` or the
-`ORGAN_MASKER_LOG_DIR` environment variable). Logging is best-effort and never touches stdout: if
+The default directory is `./ome_zarr_masker_logs` (override with `--log-dir` or the
+`OME_ZARR_MASKER_LOG_DIR` environment variable). Logging is best-effort and never touches stdout: if
 the log cannot be written (e.g. an unwritable `--log-dir`), the masking run still completes and a
 single warning is printed to stderr.
 
@@ -126,7 +131,7 @@ single warning is printed to stderr.
 The API mirrors the SAM/SAM2 predictor structure:
 
 ```python
-from organ_masker_lite import OrganMaskPredictor
+from ome_zarr_masker import OrganMaskPredictor
 
 p = OrganMaskPredictor()
 p.set_volume("input.ome.zarr", level=3)  # mirrors SAM set_image
@@ -149,7 +154,7 @@ read `mask.run_id` to correlate the result with its log file and saved `run_reco
 
 ```bash
 pip install -e ".[interactive]"
-organ-masker-lite interactive input.ome.zarr --level 3
+ome-zarr-masker interactive input.ome.zarr --level 3
 ```
 
 Place landmarks on the points layer -- new points default to positive (green); select one or more

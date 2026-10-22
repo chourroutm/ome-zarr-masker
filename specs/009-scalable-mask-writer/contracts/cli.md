@@ -2,7 +2,7 @@
 
 **Feature**: 009-scalable-mask-writer | **Date**: 2026-10-16
 
-Extends `specs/001-ome-zarr-sam-masking/contracts/cli.md` (`organ-masker-lite mask`).
+Extends `specs/001-ome-zarr-sam-masking/contracts/cli.md` (`ome-zarr-masker mask`).
 
 ## New option
 

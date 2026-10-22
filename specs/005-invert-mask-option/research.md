@@ -8,7 +8,7 @@ rejected alternatives, as this phase requires.
 ## R1: Where inversion happens in the pipeline
 
 **Decision**: Append inversion as the last step inside `postprocess_mask()`
-(`src/organ_masker_lite/postprocess/morphology.py`), after dilate, erode, and fill-holes.
+(`src/ome_zarr_masker/postprocess/morphology.py`), after dilate, erode, and fill-holes.
 
 **Rationale**: FR-004 requires `--dilate`/`--erode`/`--fill-holes` to always act on the
 organ-labeled region, never the inverted background. `postprocess_mask()` already owns "final mask

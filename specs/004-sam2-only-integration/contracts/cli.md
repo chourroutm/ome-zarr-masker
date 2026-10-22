@@ -13,6 +13,6 @@ All other clauses in that document are unchanged by this feature.
 
 ## New clause
 
-- **C-CLI-6**: `organ-masker-lite mask ... --backend <anything>` (or `interactive ... --backend
+- **C-CLI-6**: `ome-zarr-masker mask ... --backend <anything>` (or `interactive ... --backend
   <anything>`) MUST fail immediately with `argparse`'s standard "unrecognized arguments" error and a
   non-zero exit code, since `--backend` is not a recognized flag (FR-004).

@@ -3,7 +3,7 @@
 This feature introduces no new domain entity. It adds one field to an existing configuration
 dataclass and changes the derived values that depend on it.
 
-## `PostProcessConfig` (`src/organ_masker_lite/config.py`)
+## `PostProcessConfig` (`src/ome_zarr_masker/config.py`)
 
 Existing fields (unchanged):
 

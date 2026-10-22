@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from organ_masker_lite.config import COARSEST_LEVEL
-from organ_masker_lite.io.reader import OmeZarrReader, ReaderError
+from ome_zarr_masker.config import COARSEST_LEVEL
+from ome_zarr_masker.io.reader import OmeZarrReader, ReaderError
 
 from ..conftest import write_ome_zarr
 

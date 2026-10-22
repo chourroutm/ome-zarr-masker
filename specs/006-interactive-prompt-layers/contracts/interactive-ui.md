@@ -1,7 +1,7 @@
 # Interactive Session UI Contract: Prompt Layers
 
 Extends the `interactive` subcommand's existing contract (napari session launched by
-`organ-masker-lite interactive <input>`). Supersedes the single "prompts" points layer described
+`ome-zarr-masker interactive <input>`). Supersedes the single "prompts" points layer described
 implicitly by the current `launch()` implementation; all other `interactive` subcommand clauses
 (input/level/model-dir/no-download arguments) are unchanged.
 

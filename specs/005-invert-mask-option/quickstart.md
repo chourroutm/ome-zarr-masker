@@ -7,8 +7,8 @@ repo root.
 ## 1. Confirm `--invert` is documented and scoped correctly
 
 ```sh
-organ-masker-lite mask --help | grep -A1 invert
-organ-masker-lite interactive --help | grep invert
+ome-zarr-masker mask --help | grep -A1 invert
+ome-zarr-masker interactive --help | grep invert
 echo "exit: $?"
 ```
 
@@ -16,7 +16,7 @@ Expected: `mask --help` shows a description of `--invert` (C-CLI-8); `interactiv
 `invert` match (grep exits non-zero) — the flag does not exist on that subcommand (C-CLI-9).
 
 ```sh
-organ-masker-lite interactive <input.ome.zarr> --invert
+ome-zarr-masker interactive <input.ome.zarr> --invert
 echo "exit: $?"
 ```
 
@@ -25,13 +25,13 @@ Expected: non-zero exit, `argparse`'s standard "unrecognized arguments: --invert
 ## 2. Confirm inverted output is the exact complement of non-inverted output
 
 ```sh
-organ-masker-lite mask <input.ome.zarr> out_normal.ome.zarr --prompts <prompts.json> --level 0
-organ-masker-lite mask <input.ome.zarr> out_inverted.ome.zarr --prompts <prompts.json> --level 0 --invert
+ome-zarr-masker mask <input.ome.zarr> out_normal.ome.zarr --prompts <prompts.json> --level 0
+ome-zarr-masker mask <input.ome.zarr> out_inverted.ome.zarr --prompts <prompts.json> --level 0 --invert
 ```
 
 ```python
 import numpy as np
-from organ_masker_lite.io.reader import OmeZarrReader
+from ome_zarr_masker.io.reader import OmeZarrReader
 
 normal = np.asarray(OmeZarrReader("out_normal.ome.zarr").read_level(0))
 inverted = np.asarray(OmeZarrReader("out_inverted.ome.zarr").read_level(0))
@@ -45,9 +45,9 @@ Expected: both assertions pass. Validates FR-001–FR-003, FR-005, SC-001.
 ## 3. Confirm morphology still shapes the organ region, not the inverted background
 
 ```sh
-organ-masker-lite mask <input.ome.zarr> out_dilate_inverted.ome.zarr --prompts <prompts.json> \
+ome-zarr-masker mask <input.ome.zarr> out_dilate_inverted.ome.zarr --prompts <prompts.json> \
   --level 0 --dilate 2 --invert
-organ-masker-lite mask <input.ome.zarr> out_dilate_normal.ome.zarr --prompts <prompts.json> \
+ome-zarr-masker mask <input.ome.zarr> out_dilate_normal.ome.zarr --prompts <prompts.json> \
   --level 0 --dilate 2
 ```
 

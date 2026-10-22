@@ -10,9 +10,9 @@ build/
 .pytest_cache/
 .ruff_cache/
 
-# organ-masker-lite generated artifacts
-organ_masker_models/
-organ_masker_logs/
+# ome-zarr-masker generated artifacts
+ome_zarr_masker_models/
+ome_zarr_masker_logs/
 
 # Test reports
 test.xml

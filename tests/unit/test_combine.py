@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from organ_masker_lite.engine.combine import VoteAccumulator, combine_votes
+from ome_zarr_masker.engine.combine import VoteAccumulator, combine_votes
 
 
 def test_majority_vote():

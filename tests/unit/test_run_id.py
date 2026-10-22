@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from organ_masker_lite.input_log import generate_run_id
+from ome_zarr_masker.input_log import generate_run_id
 
 RUN_ID_RE = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{12}$")
 

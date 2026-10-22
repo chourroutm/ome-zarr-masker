@@ -6,13 +6,13 @@
 
 ## Summary
 
-organ-masker-lite writes a plain-text log file for every invocation, capturing the CLI command,
+ome-zarr-masker writes a plain-text log file for every invocation, capturing the CLI command,
 parsed arguments, the resolved effective configuration, and the landmark prompts used (from a CLI
 prompt file or the programmatic API) — including for runs that fail before producing output. The
 technical approach: a small input-logging module in the existing package, built on the Python
 standard library only (no new dependencies). Each invocation generates a run identifier and opens
 one plain-text log file named by that id/timestamp under a working-directory logs subdirectory
-(default `organ_masker_logs/`, overridable, gitignored). Inputs are recorded immediately at the
+(default `ome_zarr_masker_logs/`, overridable, gitignored). Inputs are recorded immediately at the
 start of a run so early failures are still captured; the outcome is appended at the end. Logging is
 best-effort (a logging failure warns on stderr but never aborts a valid run) and is kept off the
 machine-readable stdout stream. The same run identifier is embedded in feature 001's output
@@ -27,7 +27,7 @@ formatter), `pathlib`, `datetime`, `uuid`. No new third-party runtime dependenci
 minimal. Reuses feature 001's `RunConfig`, `PromptSet`, CLI, and API surfaces.
 
 **Storage**: Plain-text log files on the local filesystem, one per invocation, named by run
-identifier/timestamp, under a logs directory defaulting to `./organ_masker_logs/` (overridable via
+identifier/timestamp, under a logs directory defaulting to `./ome_zarr_masker_logs/` (overridable via
 option/environment).
 
 **Testing**: `pytest`. Tests read back written log files and assert content; cover success, failure
@@ -94,10 +94,10 @@ specs/002-input-logging/
 ### Source Code (repository root)
 
 ```text
-src/organ_masker_lite/
+src/ome_zarr_masker/
 ├── input_log.py         # NEW: run id, log-file lifecycle, plain-text record of inputs + outcome
 │                        #      (module deliberately NOT named `logging` to avoid shadowing stdlib)
-├── config.py            # extended: LogConfig (log_dir default ./organ_masker_logs, verbosity)
+├── config.py            # extended: LogConfig (log_dir default ./ome_zarr_masker_logs, verbosity)
 ├── cli.py               # wire global --log-dir/--log-level; open log at entry, record outcome
 └── api.py               # wire logging into OrganMaskPredictor run lifecycle
 
