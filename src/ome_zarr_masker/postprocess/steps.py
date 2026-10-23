@@ -29,6 +29,17 @@ KEYWORDS = ("default", "none")
 #: Units accepted in a radius, in metres.
 RADIUS_UNITS = {"nm": 1e-9, "um": 1e-6, "mm": 1e-3, "cm": 1e-2, "m": 1.0}
 
+#: OME-Zarr 0.5 length units for axes, in metres.
+AXIS_UNITS = {
+    "yoctometer": 1e-24, "zeptometer": 1e-21, "attometer": 1e-18, "femtometer": 1e-15,
+    "picometer": 1e-12, "angstrom": 1e-10, "nanometer": 1e-9, "micrometer": 1e-6,
+    "millimeter": 1e-3, "centimeter": 1e-2, "decimeter": 1e-1, "meter": 1.0,
+    "hectometer": 1e2, "kilometer": 1e3, "megameter": 1e6, "gigameter": 1e9,
+    "terameter": 1e12, "petameter": 1e15, "exameter": 1e18, "zettameter": 1e21,
+    "yottameter": 1e24, "inch": 0.0254, "foot": 0.3048, "yard": 0.9144, "mile": 1609.344,
+    "parsec": 3.0856775814913673e16,
+}  # fmt: skip
+
 _RADIUS = re.compile(r"^(?P<value>[0-9]*\.?[0-9]+(?:e[+-]?[0-9]+)?)\s*(?P<unit>[a-zµ]*)$")
 
 
@@ -222,8 +233,38 @@ def resolve_steps(
             r = float(step.radius.value)
             resolved.append(ResolvedStep(step, (r,) * ndim, (1.0,) * ndim))
             continue
-        raise PostProcessError(f"'{step}': physical radii are not supported yet")
+        resolved.append(_resolve_physical(step, scale, axis_units))
     return tuple(resolved)
+
+
+def _resolve_physical(
+    step: PostProcessStep, scale: Sequence[float], axis_units: Sequence[str | None]
+) -> ResolvedStep:
+    """A physical radius in voxels along each axis: ``R / voxel size`` (FR-006)."""
+    radius = step.radius
+    if any(u is None for u in axis_units):
+        raise PostProcessError(
+            f"'{step}': this store's axes declare no unit, so a physical radius can't be "
+            f"converted; give the radius in voxels instead (e.g. {step.op}:3)"
+        )
+    bad = [u for u in axis_units if u not in AXIS_UNITS]
+    if bad:
+        raise PostProcessError(
+            f"'{step}': axis unit {bad[0]!r} is not a length; give the radius in voxels instead"
+        )
+    per_unit = RADIUS_UNITS[radius.unit]
+    # each axis's voxel size, expressed in the radius's unit
+    sampling = tuple(
+        float(s) * AXIS_UNITS[u] / per_unit for s, u in zip(scale, axis_units, strict=True)
+    )
+    radius_voxels = tuple(radius.value / s for s in sampling)
+    if all(r < 1 for r in radius_voxels):
+        sizes = ", ".join(f"{s:.4g}" for s in sampling)
+        raise PostProcessError(
+            f"'{step}' is smaller than one voxel along every axis at this level (voxel size "
+            f"{sizes} {radius.unit}); use a larger radius or a finer level"
+        )
+    return ResolvedStep(step, radius_voxels, sampling)
 
 
 __all__ = [

@@ -150,3 +150,72 @@ def test_step_is_hashable_and_immutable():
     with pytest.raises(AttributeError):
         step.op = "close"  # type: ignore[misc]
     assert PostProcessSpec(steps=(), source="none").steps == ()
+
+
+# -- physical radii (US2, T015: research R2) ---------------------------------------------------
+
+DANDI_L3 = (63.0872348565356, 63.040823798627, 63.040823798627)
+
+
+def test_physical_radius_per_axis():
+    (r,) = resolve_steps(parse_steps("margin:200um").steps, DANDI_L3, UM)
+    assert r.radius_voxels == pytest.approx(tuple(200 / s for s in DANDI_L3))
+    assert r.radius_voxels == pytest.approx((3.170, 3.173, 3.173), abs=1e-3)
+    assert r.sampling == pytest.approx(DANDI_L3)
+    assert r.to_record()["radius"] == "200um"
+
+
+@pytest.mark.parametrize("text", ["margin:0.2mm", "margin:200µm", "margin:200UM", "margin:2e2um"])
+def test_physical_radius_spellings_agree(text):
+    (a,) = resolve_steps(parse_steps("margin:200um").steps, DANDI_L3, UM)
+    (b,) = resolve_steps(parse_steps(text).steps, DANDI_L3, UM)
+    assert b.radius_voxels == pytest.approx(a.radius_voxels)
+
+
+@pytest.mark.parametrize(
+    ("units", "scale", "radius", "expected"),
+    [
+        (("millimeter",) * 3, (0.05, 0.05, 0.1), "close:0.2mm", (4.0, 4.0, 2.0)),
+        (("nanometer",) * 3, (500.0, 500.0, 500.0), "dilate:2um", (4.0, 4.0, 4.0)),
+        (("centimeter",) * 3, (0.01, 0.01, 0.01), "dilate:1mm", (10.0, 10.0, 10.0)),
+        (("meter",) * 3, (1e-6, 1e-6, 2e-6), "erode:4um", (4.0, 4.0, 2.0)),
+        (
+            ("micrometer", "micrometer", "nanometer"),
+            (2.0, 2.0, 1000.0),
+            "dilate:4um",
+            (2.0, 2.0, 4.0),
+        ),
+    ],
+)
+def test_axis_unit_conversion(units, scale, radius, expected):
+    (r,) = resolve_steps(parse_steps(radius).steps, scale, units)
+    assert r.radius_voxels == pytest.approx(expected)
+    # the radius in its own unit is the same along every axis
+    assert {round(v * s, 9) for v, s in zip(r.radius_voxels, r.sampling, strict=True)} == {
+        round(r.step.radius.value, 9)
+    }
+
+
+def test_physical_radius_without_axis_units_is_rejected():
+    with pytest.raises(PostProcessError) as exc:
+        resolve_steps(parse_steps("margin:200um").steps, (1.0,) * 3, (None,) * 3)
+    msg = str(exc.value)
+    assert "margin:200um" in msg and "unit" in msg and "voxel" in msg
+
+
+def test_physical_radius_on_non_length_axes_is_rejected():
+    with pytest.raises(PostProcessError, match="second"):
+        resolve_steps(
+            parse_steps("dilate:1um").steps, (1.0,) * 3, ("second", "micrometer", "micrometer")
+        )
+
+
+def test_sub_voxel_physical_radius_is_rejected():
+    with pytest.raises(PostProcessError) as exc:
+        resolve_steps(parse_steps("margin:10um").steps, DANDI_L3, UM)
+    assert "margin:10um" in str(exc.value) and "63.04" in str(exc.value)
+
+
+def test_radius_of_one_voxel_on_one_axis_is_accepted():
+    (r,) = resolve_steps(parse_steps("dilate:10um").steps, (10.0, 40.0, 40.0), UM)
+    assert r.radius_voxels == pytest.approx((1.0, 0.25, 0.25))

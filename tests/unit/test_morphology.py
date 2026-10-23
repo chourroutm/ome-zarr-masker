@@ -203,3 +203,16 @@ def test_no_steps_returns_a_copy():
     out = apply_steps(mask, ())
     np.testing.assert_array_equal(out, mask)
     assert out is not mask
+
+
+# -- anisotropic physical radii (US2, T016) ----------------------------------------------------
+
+
+@pytest.mark.parametrize("radius", ["4um", "12um"])  # structure path and distance-transform path
+@pytest.mark.parametrize("op", ["dilate", "erode", "close", "open"])
+def test_anisotropic_radius_matches_ellipsoid_reference(op, radius):
+    mask = _random_mask((24, 30, 28), seed=3)
+    (rs,) = _resolved(f"{op}:{radius}", scale=(2.0, 1.0, 1.0), units=("micrometer",) * 3)
+    r = float(radius[:-2])
+    assert rs.radius_voxels == pytest.approx((r / 2, r, r))
+    np.testing.assert_array_equal(apply_steps(mask, (rs,), slab=5), REFERENCES[op](mask, rs))
