@@ -8,14 +8,16 @@ in napari/Qt.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
 
 from .api import MaskResult, OrganMaskPredictor
-from .config import COARSEST_LEVEL, PostProcessConfig
+from .config import COARSEST_LEVEL
 from .io.location import RemoteStoreError, StoreLocation
 from .io.reader import OmeZarrReader
+from .postprocess.steps import PostProcessSpec
 
 
 class _PreviewBusyGuard:
@@ -113,7 +115,7 @@ class InteractiveSession:
         axes: list[str] | None = None,
         direction: str = "forward",
         combine_rule: str = "majority",
-        postprocess: PostProcessConfig | None = None,
+        postprocess: str | Sequence[str] | PostProcessSpec | None = None,
         frame_range: tuple[int, int] | None = None,
     ) -> MaskResult:
         """Run the shared engine on the current prompts and cache the resulting mask.

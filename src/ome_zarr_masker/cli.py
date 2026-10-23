@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .config import COARSEST_LEVEL, LogConfig, PostProcessConfig, RunConfig
+from .config import COARSEST_LEVEL, LogConfig, RunConfig
+from .postprocess.steps import PostProcessError, parse_steps
 from .prompts.model import PromptError, load_prompt_file
 
 _LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
@@ -30,6 +31,33 @@ def _add_log_options(parser: argparse.ArgumentParser) -> None:
         choices=_LOG_LEVELS,
         help="Logging verbosity (default: INFO)",
     )
+
+
+_POSTPROCESS_HELP = (
+    "Post-processing steps applied in order to the run-level mask, comma separated: fill (fill "
+    "holes), close:R, open:R, dilate:R, erode:R, margin:R (same as dilate), largest (keep the "
+    "largest connected component), invert. R is a number of run-level voxels or a length with a "
+    "unit (nm, um, mm, cm, m), e.g. close:3,fill,largest,margin:200um. 'default' (the default) "
+    "uses the steps saved in the prompt file, or none; 'none' applies no steps"
+)
+
+
+class _RemovedOption(argparse.Action):
+    """A post-processing option removed by feature 011: a usage error pointing to --postprocess."""
+
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ANN001
+        parser.error(
+            f"{option_string} was removed; use --postprocess with ordered steps instead, e.g. "
+            "--postprocess close:3,fill,largest,margin:3,invert"
+        )
+
+
+def _add_postprocess_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--postprocess", default="default", metavar="STEPS", help=_POSTPROCESS_HELP)
+    for flag in ("--fill-holes", "--no-fill-holes", "--invert"):
+        parser.add_argument(flag, nargs=0, action=_RemovedOption, help=argparse.SUPPRESS)
+    for flag in ("--dilate", "--erode"):
+        parser.add_argument(flag, nargs="?", action=_RemovedOption, help=argparse.SUPPRESS)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -63,31 +91,7 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=("majority", "union", "intersection"),
         help="Consensus rule when combining sweeps (default: majority)",
     )
-    mask.add_argument(
-        "--fill-holes",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Fill interior holes in the mask (default: on; use --no-fill-holes to disable)",
-    )
-    mask.add_argument(
-        "--dilate",
-        type=int,
-        default=0,
-        dest="dilation_radius",
-        help="Dilation radius in voxels (default: 0)",
-    )
-    mask.add_argument(
-        "--erode",
-        type=int,
-        default=0,
-        dest="erosion_radius",
-        help="Erosion radius in voxels (default: 0)",
-    )
-    mask.add_argument(
-        "--invert",
-        action="store_true",
-        help="Swap the output mask's values: background becomes 1, organ becomes 0 (default: off)",
-    )
+    _add_postprocess_options(mask)
     mask.add_argument("--overwrite", action="store_true", help="Overwrite an existing output")
     mask.add_argument(
         "--workers",
@@ -165,17 +169,19 @@ def _cmd_mask(args: argparse.Namespace) -> int:
             return 1
 
         try:
+            postprocess = parse_steps(args.postprocess)
+        except PostProcessError as exc:
+            log.mark_failed(str(exc))
+            print(f"error: --postprocess: {exc}", file=sys.stderr)
+            return 1
+
+        try:
             config = RunConfig(
                 level=args.level,
                 axes=[a.strip() for a in args.axes.split(",") if a.strip()],
                 direction=args.direction,
                 combine_rule=args.combine,
-                postprocess=PostProcessConfig(
-                    fill_holes=args.fill_holes,
-                    dilation_radius=args.dilation_radius,
-                    erosion_radius=args.erosion_radius,
-                    invert=args.invert,
-                ),
+                postprocess=postprocess,
                 overwrite=args.overwrite,
             )
         except ValueError as exc:
@@ -207,6 +213,7 @@ def _cmd_mask(args: argparse.Namespace) -> int:
             PromptError,
             PipelineError,
             RemoteStoreError,
+            PostProcessError,
         ) as exc:
             log.mark_failed(str(exc))
             print(f"error: {exc}", file=sys.stderr)

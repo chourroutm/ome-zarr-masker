@@ -13,18 +13,19 @@ Mirrors the structure of the SAM/SAM2 predictor so SAM users adopt it with minim
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
 
-from .config import COARSEST_LEVEL, LogConfig, PostProcessConfig, RunConfig
+from .config import COARSEST_LEVEL, LogConfig, RunConfig
 from .engine.pipeline import compute_mask
 from .input_log import log_invocation
 from .io.location import StoreLocation
 from .io.reader import OmeZarrReader
 from .io.validate import validate_ome_zarr
 from .io.writer import write_mask
+from .postprocess.steps import PostProcessSpec, parse_steps
 from .prompts.model import Prompt, PromptError, PromptSet
 
 
@@ -158,20 +159,27 @@ class OrganMaskPredictor:
         axes: list[str] | None = None,
         direction: str = "forward",
         combine_rule: str = "majority",
-        postprocess: PostProcessConfig | None = None,
+        postprocess: str | Sequence[str] | PostProcessSpec | None = None,
         frame_range: tuple[int, int] | None = None,
     ) -> MaskResult:
         """Sweep, combine, and return a :class:`MaskResult` (equivalent to CLI output, SC-005).
 
         ``frame_range`` restricts the sweep to an inclusive range of frames on the prompted axis
         (feature 007); ``None`` (default) sweeps the full axis, unchanged from before.
+
+        ``postprocess`` lists the post-processing steps applied in order (feature 011), in the CLI's
+        notation: ``"close:3,fill,largest,margin:200um"`` or ``["close:3", "fill"]``. There is no
+        prompt file here, so ``None``, ``"default"`` and ``"none"`` all mean no steps. Raises
+        ``PostProcessError`` for an invalid step.
         """
         self._require_volume()
+        if not isinstance(postprocess, PostProcessSpec):
+            postprocess = parse_steps(postprocess, source="api")
         kwargs: dict = {
             "level": self._level,
             "direction": direction,
             "combine_rule": combine_rule,
-            "postprocess": postprocess or PostProcessConfig(),
+            "postprocess": postprocess.inherit(None),
             "model_dir": Path(self._model_dir) if self._model_dir is not None else None,
             "allow_download": self._allow_download,
             "frame_range": frame_range,

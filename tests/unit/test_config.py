@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from ome_zarr_masker.config import MODEL_DIR_ENV, PostProcessConfig, RunConfig
+from ome_zarr_masker.config import MODEL_DIR_ENV, RunConfig
+from ome_zarr_masker.postprocess.steps import parse_steps
 
 
 def test_default_model_dir_is_cwd_subdir(tmp_path, monkeypatch):
@@ -38,15 +39,19 @@ def test_to_record_round_trips_key_fields():
     assert "model_dir" in rec
 
 
-def test_postprocess_invert_defaults_off_and_is_not_noop_when_set():
-    assert PostProcessConfig().invert is False
-    assert PostProcessConfig(invert=True).is_noop is False
+def test_postprocess_defaults_to_the_default_keyword():
+    """Feature 011: no post-processing option means `default` (inherit saved steps, else none)."""
+    cfg = RunConfig()
+    assert cfg.postprocess.steps is None and cfg.postprocess.source == "default"
+    assert cfg.to_record()["postprocess"] == {"source": "default", "steps": []}
 
 
-def test_to_record_includes_invert():
-    assert RunConfig().to_record()["postprocess"]["invert"] is False
-    cfg = RunConfig(postprocess=PostProcessConfig(invert=True))
-    assert cfg.to_record()["postprocess"]["invert"] is True
+def test_to_record_lists_steps_in_order():
+    cfg = RunConfig(postprocess=parse_steps("close:3,fill,invert"))
+    rec = cfg.to_record()["postprocess"]
+    assert rec["source"] == "cli"
+    assert [s["op"] for s in rec["steps"]] == ["close", "fill", "invert"]
+    assert rec["steps"][0] == {"op": "close", "radius": "3", "radius_voxels": None}
 
 
 def test_frame_range_defaults_to_none():

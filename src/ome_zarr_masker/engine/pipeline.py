@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +15,8 @@ from ..io.location import StoreLocation
 from ..io.reader import OmeZarrReader, ReaderError
 from ..io.validate import validate_ome_zarr
 from ..io.writer import check_output, write_mask
-from ..postprocess.morphology import postprocess_mask
+from ..postprocess.morphology import apply_steps
+from ..postprocess.steps import resolve_steps
 from ..prompts.model import Prompt, PromptError, PromptSet
 from ..sam2 import Sam2Backend
 from .combine import VoteAccumulator
@@ -161,6 +162,12 @@ def compute_mask(
     # The user places landmarks on the prompted axis's planes; validate against that axis (FR-022).
     prompts.validate(level_shape, prompted_index)
 
+    # Post-processing (feature 011): `default` takes the prompt file's saved steps, and radii are
+    # resolved for this level now, so a bad step fails before any segmentation (FR-008).
+    spec = config.postprocess.inherit(prompts.postprocess)
+    resolved = resolve_steps(spec.steps, reader.level_transform(level)[0], reader.axis_units)
+    config = replace(config, postprocess=spec, resolved_postprocess=resolved)
+
     report(f"reading level {level} {level_shape}")
     volume = reader.read_level(level)
 
@@ -225,9 +232,9 @@ def compute_mask(
 
         consensus = accumulator.result(config.combine_rule)
 
-    if not config.postprocess.is_noop:
-        report("post-processing mask")
-        consensus = postprocess_mask(consensus, config.postprocess)
+    if resolved:
+        report(f"post-processing mask: {spec.text()}")
+        consensus = apply_steps(consensus, resolved)
 
     if config.frame_range is not None:
         consensus = _place_at_offset(consensus, frame_offset, prompted_index, level_shape)

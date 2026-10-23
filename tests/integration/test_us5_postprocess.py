@@ -1,10 +1,11 @@
-"""US5: optional mask post-processing (T050, FR-012, SC-007).
+"""US5: optional mask post-processing (T050, FR-012, SC-007), in feature 011's step notation.
 
 Uses a hollow-shell volume, carved so the raw consensus has a genuine interior cavity if SAM2's
 segmentation reproduces it exactly (not guaranteed for a learned model on a synthetic shape).
 Verifies that fill-holes always yields zero interior holes and never shrinks the raw mask (with
 strict growth only when the raw mask actually had a hole to fill), that disabling post-processing
-leaves the raw mask unchanged, and that explicit dilate/erode radii are applied exactly.
+leaves the raw mask unchanged, and that explicit dilate/erode radii are applied exactly. A ball of
+radius 1 is the 6-neighbour cross, so `dilate:1`/`erode:1` equal one iteration of SciPy's default.
 """
 
 from __future__ import annotations
@@ -66,7 +67,7 @@ def _run(store, out, prompts, *extra):
 
 @pytest.mark.real_backend
 @pytest.mark.skipif(not _HAVE_SAM2, reason="sam2 backend not constructable")
-def test_default_fillholes_disabled_and_exact_morphology(tmp_path):
+def test_fill_none_and_exact_morphology(tmp_path):
     store = _hollow_store(tmp_path)
     prompts = _prompts(tmp_path / "p.json")
 
@@ -74,14 +75,14 @@ def test_default_fillholes_disabled_and_exact_morphology(tmp_path):
     # cavity, but real SAM2's learned segmentation (unlike the old deterministic stub) isn't
     # guaranteed to reproduce it as an enclosed hole -- so this is observed, not asserted.
     raw_out = tmp_path / "raw.ome.zarr"
-    assert _run(store, raw_out, prompts, "--no-fill-holes") == 0
+    assert _run(store, raw_out, prompts, "--postprocess", "none") == 0
     raw = OmeZarrReader(raw_out).read_level(0).astype(bool)
     n_holes_raw = _holes(raw)
 
-    # default: fill-holes never leaves interior holes, and never shrinks the raw mask. It's a
+    # fill never leaves interior holes, and never shrinks the raw mask. It's a
     # strict superset only when there was a hole to fill in the first place.
     filled_out = tmp_path / "filled.ome.zarr"
-    assert _run(store, filled_out, prompts) == 0
+    assert _run(store, filled_out, prompts, "--postprocess", "fill") == 0
     filled = OmeZarrReader(filled_out).read_level(0).astype(bool)
     assert _holes(filled) == 0
     assert filled.sum() >= raw.sum()
@@ -91,13 +92,13 @@ def test_default_fillholes_disabled_and_exact_morphology(tmp_path):
 
     # explicit dilation is applied exactly (isolated from fill-holes)
     dil_out = tmp_path / "dil.ome.zarr"
-    assert _run(store, dil_out, prompts, "--no-fill-holes", "--dilate", "1") == 0
+    assert _run(store, dil_out, prompts, "--postprocess", "dilate:1") == 0
     dil = OmeZarrReader(dil_out).read_level(0).astype(bool)
     assert np.array_equal(dil, ndimage.binary_dilation(raw, iterations=1))
 
     # explicit erosion is applied exactly
     ero_out = tmp_path / "ero.ome.zarr"
-    assert _run(store, ero_out, prompts, "--no-fill-holes", "--erode", "1") == 0
+    assert _run(store, ero_out, prompts, "--postprocess", "erode:1") == 0
     ero = OmeZarrReader(ero_out).read_level(0).astype(bool)
     assert np.array_equal(ero, ndimage.binary_erosion(raw, iterations=1))
 
@@ -109,25 +110,23 @@ def test_invert_is_exact_complement_end_to_end(tmp_path):
     prompts = _prompts(tmp_path / "p.json")
 
     normal_out = tmp_path / "normal.ome.zarr"
-    assert _run(store, normal_out, prompts) == 0
+    assert _run(store, normal_out, prompts, "--postprocess", "fill") == 0
     normal = OmeZarrReader(normal_out).read_level(0)
     assert normal.dtype == np.uint8
 
     inverted_out = tmp_path / "inverted.ome.zarr"
-    assert _run(store, inverted_out, prompts, "--invert") == 0
+    assert _run(store, inverted_out, prompts, "--postprocess", "fill,invert") == 0
     inverted = OmeZarrReader(inverted_out).read_level(0)
     assert inverted.dtype == np.uint8
     assert np.array_equal(inverted, 1 - normal)
 
-    # invert is applied after dilation (FR-004): the dilated organ region is identical either way,
+    # steps run in order: with invert last, the dilated organ region is identical either way and
     # only the final polarity differs.
     dil_out = tmp_path / "dil.ome.zarr"
-    assert _run(store, dil_out, prompts, "--no-fill-holes", "--dilate", "1") == 0
+    assert _run(store, dil_out, prompts, "--postprocess", "dilate:1") == 0
     dil = OmeZarrReader(dil_out).read_level(0)
 
     dil_inverted_out = tmp_path / "dil_inverted.ome.zarr"
-    assert (
-        _run(store, dil_inverted_out, prompts, "--no-fill-holes", "--dilate", "1", "--invert") == 0
-    )
+    assert _run(store, dil_inverted_out, prompts, "--postprocess", "dilate:1,invert") == 0
     dil_inverted = OmeZarrReader(dil_inverted_out).read_level(0)
     assert np.array_equal(dil_inverted, 1 - dil)

@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from ..geometry import nearest_index
+from ..postprocess.steps import PostProcessStep
 
 #: A pyramid level's ``(scale, translation)``, one value per axis.
 LevelGeometry = tuple[tuple[float, ...], tuple[float, ...]]
@@ -70,6 +71,8 @@ class PromptSet:
 
     prompts: list[Prompt] = field(default_factory=list)
     level: int | None = None
+    #: Post-processing steps saved with the prompts (feature 011); ``None`` when none are saved.
+    postprocess: tuple[PostProcessStep, ...] | None = None
 
     def has_positive(self) -> bool:
         return any(p.point_labels.tolist().count(1) or p.box is not None for p in self.prompts)
@@ -135,7 +138,7 @@ class PromptSet:
             new.box = boxes.get(i)
             new.obj_id = p.obj_id
             out.append(new)
-        return PromptSet(prompts=out, level=self.level)
+        return PromptSet(prompts=out, level=self.level, postprocess=self.postprocess)
 
     def validate(self, level_shape: tuple[int, ...], axis_index: int) -> None:
         """Validate prompts against the selected level (FR-015).

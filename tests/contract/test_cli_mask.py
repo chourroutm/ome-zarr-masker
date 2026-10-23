@@ -57,19 +57,26 @@ def test_usage_error_exits_two():
     assert exc.value.code == 2
 
 
-def test_invert_flag_documented_in_help(capsys):
-    """C-CLI-8: `mask --help` describes --invert."""
+def test_postprocess_documented_in_help(capsys):
+    """Feature 011: `mask --help` describes --postprocess, its steps and keywords."""
     with pytest.raises(SystemExit) as exc:
         main(["mask", "--help"])
     assert exc.value.code == 0
-    assert "--invert" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    for word in ("--postprocess", "close", "largest", "margin", "invert", "default", "none"):
+        assert word in out
 
 
-def test_interactive_invert_flag_rejected():
-    """C-CLI-9: --invert is scoped to `mask`; `interactive` rejects it as unrecognized."""
+@pytest.mark.parametrize(
+    "removed",
+    [["--invert"], ["--fill-holes"], ["--no-fill-holes"], ["--dilate", "1"], ["--erode", "1"]],
+)
+def test_removed_postprocess_options_point_to_postprocess(removed, capsys):
+    """Feature 011, FR-010: the old options are usage errors naming --postprocess."""
     with pytest.raises(SystemExit) as exc:
-        main(["interactive", "in.ome.zarr", "--invert"])
+        main(["mask", "in.ome.zarr", "out.ome.zarr", "--prompts", "p.json", *removed])
     assert exc.value.code == 2
+    assert "--postprocess" in capsys.readouterr().err
 
 
 def test_backend_flag_rejected(valid_input, tmp_path):
@@ -333,3 +340,65 @@ def test_missing_remote_input_exits_one(tmp_path, http_store_server, capsys):
     assert code == 1 and captured.out == ""
     assert "not found" in captured.err and url in captured.err
     assert not out.exists()
+
+
+# -- ordered post-processing (feature 011, T007: contracts/cli.md C-CLI-PP-1..3) --------------
+
+
+def _mask_cli(valid_input, out, prompts, *extra):
+    return main(
+        ["mask", str(valid_input), str(out), "--prompts", str(prompts), "--level", "0", *extra]
+    )
+
+
+@pytest.mark.parametrize(("value", "needle"), [("blur:3", "blur:3"), ("fill:2", "fill:2")])
+def test_invalid_postprocess_exits_one_before_segmentation(
+    valid_input, tmp_path, monkeypatch, capsys, value, needle
+):
+    from ome_zarr_masker.engine import pipeline
+
+    calls = []
+    monkeypatch.setattr(pipeline, "Sam2Backend", lambda config=None: calls.append(1))
+    out = tmp_path / "out.ome.zarr"
+    code = _mask_cli(valid_input, out, _single_point_prompts(tmp_path), "--postprocess", value)
+    captured = capsys.readouterr()
+    assert code == 1 and calls == [] and captured.out == ""
+    assert len(captured.err.strip().splitlines()) == 1
+    assert needle in captured.err and "--postprocess" in captured.err
+    assert not out.exists()
+
+
+def test_postprocess_steps_applied_in_order_and_recorded(valid_input, tmp_path, stub_sam2):
+    from ome_zarr_masker.postprocess.morphology import apply_steps
+    from ome_zarr_masker.postprocess.steps import parse_steps, resolve_steps
+
+    prompts = _single_point_prompts(tmp_path)
+    raw_out, out = tmp_path / "raw.ome.zarr", tmp_path / "pp.ome.zarr"
+    assert _mask_cli(valid_input, raw_out, prompts, "--postprocess", "none") == 0
+    assert _mask_cli(valid_input, out, prompts, "--postprocess", "close:1,fill") == 0
+
+    raw = OmeZarrReader(raw_out).read_level(0).astype(bool)
+    steps = resolve_steps(parse_steps("close:1,fill").steps, (1.0,) * 3, (None,) * 3)
+    expected = apply_steps(raw, steps).astype(np.uint8)
+    np.testing.assert_array_equal(OmeZarrReader(out).read_level(0), expected)
+
+    record = json.loads((out / "run_record.json").read_text())["config"]["postprocess"]
+    assert record == {
+        "source": "cli",
+        "steps": [
+            {"op": "close", "radius": "1", "radius_voxels": [1.0, 1.0, 1.0]},
+            {"op": "fill", "radius": None, "radius_voxels": None},
+        ],
+    }
+    assert "close:1" in _log_text(tmp_path)
+
+
+def test_no_postprocess_option_means_no_steps(valid_input, tmp_path, stub_sam2):
+    """FR-004: the default is `default`; with no saved steps nothing (not even fill) is applied."""
+    prompts = _single_point_prompts(tmp_path)
+    a, b = tmp_path / "a.ome.zarr", tmp_path / "b.ome.zarr"
+    assert _mask_cli(valid_input, a, prompts) == 0
+    assert _mask_cli(valid_input, b, prompts, "--postprocess", "none") == 0
+    np.testing.assert_array_equal(OmeZarrReader(a).read_level(0), OmeZarrReader(b).read_level(0))
+    record = json.loads((a / "run_record.json").read_text())["config"]["postprocess"]
+    assert record == {"source": "default", "steps": []}

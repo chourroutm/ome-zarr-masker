@@ -1,4 +1,4 @@
-"""Run and post-processing configuration, and model-directory resolution."""
+"""Run configuration (including the post-processing steps) and model-directory resolution."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from .postprocess.steps import PostProcessSpec, ResolvedStep, parse_steps
 
 DEFAULT_MODEL_DIR = "ome_zarr_masker_models"
 MODEL_DIR_ENV = "OME_ZARR_MASKER_MODEL_DIR"
@@ -49,29 +51,6 @@ class LogConfig:
 
 
 @dataclass
-class PostProcessConfig:
-    """Optional mask post-processing (disabled morphology, hole-filling on by default)."""
-
-    fill_holes: bool = True
-    dilation_radius: int = 0
-    erosion_radius: int = 0
-    invert: bool = False
-
-    def __post_init__(self) -> None:
-        if self.dilation_radius < 0 or self.erosion_radius < 0:
-            raise ValueError("dilation_radius and erosion_radius must be non-negative")
-
-    @property
-    def is_noop(self) -> bool:
-        return (
-            not self.fill_holes
-            and self.dilation_radius == 0
-            and self.erosion_radius == 0
-            and not self.invert
-        )
-
-
-@dataclass
 class RunConfig:
     """The complete, reproducible parameterization of a masking run (FR-014)."""
 
@@ -79,11 +58,14 @@ class RunConfig:
     axes: list[str] = field(default_factory=lambda: ["z"])
     direction: str = "forward"
     combine_rule: str = "majority"
-    postprocess: PostProcessConfig = field(default_factory=PostProcessConfig)
+    #: Ordered post-processing (feature 011); ``default`` inherits the prompt file's saved steps.
+    postprocess: PostProcessSpec = field(default_factory=lambda: parse_steps("default"))
     model_dir: Path | None = None
     allow_download: bool = True
     overwrite: bool = False
     frame_range: tuple[int, int] | None = None
+    #: ``postprocess`` resolved for the run level (set by the pipeline before segmentation).
+    resolved_postprocess: tuple[ResolvedStep, ...] | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         # ``level`` is either the COARSEST sentinel or a concrete non-negative index (FR-003).
@@ -139,6 +121,16 @@ class RunConfig:
         (downloader or default_weight_downloader)(url, path)
         return path
 
+    def _postprocess_record(self) -> dict:
+        """The steps in order and their source (feature 011, FR-012): resolved radii once known."""
+        if self.resolved_postprocess is not None:
+            steps = [s.to_record() for s in self.resolved_postprocess]
+        else:
+            steps = [ResolvedStep(s).to_record() for s in self.postprocess.steps or ()]
+            for rec, s in zip(steps, self.postprocess.steps or (), strict=True):
+                rec["radius"] = None if s.radius is None else s.radius.text
+        return {"source": self.postprocess.source, "steps": steps}
+
     def to_record(self) -> dict:
         """Serialize the configuration for the reproducibility run-record (FR-014)."""
         return {
@@ -147,12 +139,7 @@ class RunConfig:
             "axes": list(self.axes),
             "direction": self.direction,
             "combine_rule": self.combine_rule,
-            "postprocess": {
-                "fill_holes": self.postprocess.fill_holes,
-                "dilation_radius": self.postprocess.dilation_radius,
-                "erosion_radius": self.postprocess.erosion_radius,
-                "invert": self.postprocess.invert,
-            },
+            "postprocess": self._postprocess_record(),
             "model_dir": str(self.resolved_model_dir()),
             "allow_download": self.allow_download,
             "frame_range": list(self.frame_range) if self.frame_range is not None else None,
