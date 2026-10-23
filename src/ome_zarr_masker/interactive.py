@@ -17,7 +17,11 @@ from .api import MaskResult, OrganMaskPredictor
 from .config import COARSEST_LEVEL
 from .io.location import RemoteStoreError, StoreLocation
 from .io.reader import OmeZarrReader
-from .postprocess.steps import PostProcessSpec
+from .postprocess.steps import PostProcessSpec, parse_steps, resolve_steps
+from .prompts.model import Prompt, PromptSet, load_prompt_file, save_prompt_file
+
+#: Where the session saves prompts when no prompt file is given (feature 011).
+DEFAULT_PROMPTS = Path("prompts.json")
 
 
 class _PreviewBusyGuard:
@@ -63,8 +67,17 @@ class InteractiveSession:
         model_dir: str | Path | None = None,
         allow_download: bool = True,
         *,
+        prompts_path: str | Path | None = None,
+        postprocess: str | Sequence[str] | PostProcessSpec | None = None,
         predictor: OrganMaskPredictor | None = None,
     ):
+        """Open ``store_path`` at ``level`` (feature 011: with a prompt file and steps).
+
+        ``prompts_path`` is where prompts are loaded from (when the file exists) and saved to
+        (default ``prompts.json``). ``postprocess`` sets the session's post-processing steps, in
+        the CLI's notation; with ``None``/``"default"`` the steps saved in the prompt file are used,
+        else none. Raises ``PostProcessError``/``PromptError`` for invalid steps or prompts.
+        """
         self._store_path = str(store_path)
         self._location = StoreLocation.parse(store_path)  # local path or URL (feature 010)
         self._level = level
@@ -78,6 +91,81 @@ class InteractiveSession:
         self._boxes: dict[int, np.ndarray] = {}
         self._preview: MaskResult | None = None
         self._last_preview_kwargs: dict = {}
+
+        self.prompts_path = Path(prompts_path) if prompts_path is not None else DEFAULT_PROMPTS
+        saved = self._load_prompts() if self.prompts_path.exists() else None
+        spec = postprocess if isinstance(postprocess, PostProcessSpec) else parse_steps(postprocess)
+        self.postprocess: PostProcessSpec = self._checked(spec.inherit(saved))
+
+    # -- prompt file and post-processing steps (feature 011) -------------
+    @property
+    def points(self) -> list[tuple[int, float, float, int]]:
+        """Current points as ``(frame, x, y, label)`` at the session level (1 = positive)."""
+        return list(self._points)
+
+    @property
+    def boxes(self) -> dict[int, np.ndarray]:
+        """Current boxes by frame, ``[x0, y0, x1, y1]`` at the session level."""
+        return dict(self._boxes)
+
+    @property
+    def has_prompts(self) -> bool:
+        return bool(self._points or self._boxes)
+
+    def _run_level(self) -> int:
+        return self._predictor._level
+
+    def _reader(self) -> OmeZarrReader:
+        return self._predictor._reader
+
+    def _load_prompts(self):  # noqa: ANN202 - the loaded steps (or None)
+        """Load ``prompts_path``, converted to the session level (feature 008); return its steps."""
+        loaded = load_prompt_file(self.prompts_path)
+        reader, level = self._reader(), self._run_level()
+        if loaded.level is not None and loaded.level != level:
+            axis = reader.axes.index("z") if "z" in reader.axes else 0
+            loaded = loaded.resolved_between(
+                reader.level_transform(loaded.level), reader.level_transform(level), axis
+            )
+        for p in loaded.prompts:
+            for (x, y), label in zip(p.point_coords.tolist(), p.point_labels.tolist(), strict=True):
+                self._points.append((p.frame_index, float(x), float(y), int(label)))
+            if p.box is not None:
+                self._boxes[p.frame_index] = np.asarray(p.box, dtype=float)
+        return loaded.postprocess
+
+    def _checked(self, spec: PostProcessSpec) -> PostProcessSpec:
+        """Resolve ``spec`` against the run level now, so a bad radius fails here (FR-008)."""
+        reader = self._reader()
+        scale = reader.level_transform(self._run_level())[0]
+        resolve_steps(spec.steps or (), scale, reader.axis_units)
+        return spec
+
+    def set_postprocess(self, value: str | Sequence[str] | PostProcessSpec) -> InteractiveSession:
+        """Replace the session's steps (the panel's value); on error the previous ones stay."""
+        spec = value if isinstance(value, PostProcessSpec) else parse_steps(value)
+        self.postprocess = self._checked(spec.inherit(None))
+        self._preview = None
+        return self
+
+    def save_prompts(self, path: str | Path | None = None) -> Path:
+        """Write the prompts and the current steps to ``path`` (default: ``prompts_path``)."""
+        prompts = [
+            Prompt(frame_index=f, point_coords=[[x, y]], point_labels=[label])
+            for f, x, y, label in self._points
+        ]
+        prompts += [
+            Prompt(
+                frame_index=f,
+                point_coords=np.empty((0, 2)),
+                point_labels=np.empty((0,), dtype=int),
+                box=box,
+            )
+            for f, box in sorted(self._boxes.items())
+        ]
+        steps = self.postprocess.steps or ()
+        prompt_set = PromptSet(prompts, level=self._run_level(), postprocess=tuple(steps))
+        return save_prompt_file(path if path is not None else self.prompts_path, prompt_set)
 
     # -- prompt placement -------------------------------------------------
     def add_point(
@@ -153,7 +241,8 @@ class InteractiveSession:
             axes=axes,
             direction=direction,
             combine_rule=combine_rule,
-            postprocess=postprocess,
+            # the session's steps (the panel's value) unless this call overrides them (feature 011)
+            postprocess=self.postprocess if postprocess is None else postprocess,
             frame_range=frame_range,
         )
         return self._preview
@@ -203,6 +292,12 @@ class InteractiveSession:
         status-bar busy indicator and ignore a repeat trigger while already computing
         (FR-010/FR-011). ``e`` exports the full whole-volume mask, always freshly computed
         regardless of the last preview mode (FR-008). All masking goes through the shared engine.
+
+        Feature 011: a "Post-processing" panel holds the session's steps (pre-filled from
+        ``--postprocess`` or the prompt file); edits are applied with "Apply" and before every
+        preview, export and save, and an invalid edit is refused with the CLI's message, keeping
+        the previous steps. "Save prompts" (or ``w``) writes the prompts and the panel's steps to
+        ``prompts_path``; prompts loaded from that file are shown in the layers at start.
         """
         from napari.qt.threading import thread_worker
         from qtpy.QtCore import QTimer
@@ -317,9 +412,59 @@ class InteractiveSession:
                 y1, x1 = float(verts[:, 1].max()), float(verts[:, 2].max())
                 self.add_box(frame, [x0, y0, x1, y1])
 
+        # prompts loaded from the prompt file (feature 011): show them, so syncing keeps them
+        for label, layer in ((1, positive_layer), (0, negative_layer)):
+            pts = [[f, y, x] for f, x, y, lbl in self._points if lbl == label]
+            if pts:
+                layer.data = np.asarray(pts, dtype=float)
+        for f, (x0, y0, x1, y1) in sorted(self._boxes.items()):
+            corners = [[f, y0, x0], [f, y0, x1], [f, y1, x1], [f, y1, x0]]
+            box_layer.add(np.asarray(corners, dtype=float), shape_type="rectangle")
+
+        from qtpy.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+
+        def _steps_text() -> str:
+            return ",".join(map(str, self.postprocess.steps or ()))
+
+        panel = QWidget()
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.addWidget(QLabel("Post-processing steps, applied in order"))
+        steps_edit = QLineEdit(_steps_text())
+        steps_edit.setPlaceholderText("e.g. close:3,fill,largest,margin:200um (empty: none)")
+        panel_layout.addWidget(steps_edit)
+        buttons = QHBoxLayout()
+        apply_button, save_button = QPushButton("Apply"), QPushButton("Save prompts")
+        buttons.addWidget(apply_button)
+        buttons.addWidget(save_button)
+        panel_layout.addLayout(buttons)
+
+        def _apply_panel_steps() -> bool:
+            """Use the panel's text as the session's steps; refuse (and restore) an invalid one."""
+            text = steps_edit.text().strip()
+            if text == _steps_text():
+                return True
+            try:
+                self.set_postprocess(text or "none")
+            except ValueError as exc:
+                QMessageBox.warning(None, "Invalid post-processing steps", str(exc))
+                steps_edit.setText(_steps_text())
+                return False
+            viewer.status = f"post-processing: {_steps_text() or 'none'}"
+            return True
+
         def _sync_prompts_from_layers() -> None:
             _sync_points_from_layer()
             _sync_boxes_from_layer()
+            _apply_panel_steps()
+
+        def _save_prompts() -> None:
+            _sync_prompts_from_layers()
+            path = self.save_prompts()
+            viewer.status = f"saved prompts and post-processing steps to {path}"
+
+        apply_button.clicked.connect(_apply_panel_steps)
+        save_button.clicked.connect(_save_prompts)
+        viewer.window.add_dock_widget(panel, name="Post-processing", area="right")
 
         n_frames = volume.shape[0]
         busy_guard = _PreviewBusyGuard()
@@ -394,6 +539,10 @@ class InteractiveSession:
             _sync_prompts_from_layers()
             result = self.preview(axes=["z"])
             _merge_into_preview_layer(result.array, (0, n_frames - 1))
+
+        @viewer.bind_key("w")
+        def _save(_viewer):  # noqa: ANN001
+            _save_prompts()
 
         @viewer.bind_key("e")
         def _export(_viewer):  # noqa: ANN001

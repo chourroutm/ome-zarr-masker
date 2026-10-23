@@ -402,3 +402,46 @@ def test_no_postprocess_option_means_no_steps(valid_input, tmp_path, stub_sam2):
     np.testing.assert_array_equal(OmeZarrReader(a).read_level(0), OmeZarrReader(b).read_level(0))
     record = json.loads((a / "run_record.json").read_text())["config"]["postprocess"]
     assert record == {"source": "default", "steps": []}
+
+
+# -- steps saved in the prompt file (feature 011 US3, T021) ------------------------------------
+
+
+def _prompts_with_steps(tmp_path, steps) -> Path:
+    path = tmp_path / "saved.json"
+    obj = {"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}]}
+    path.write_text(json.dumps({"level": 0, "objects": [obj], "postprocess": steps}))
+    return path
+
+
+def _pp_record(out) -> dict:
+    return json.loads((out / "run_record.json").read_text())["config"]["postprocess"]
+
+
+def test_saved_steps_are_inherited_overridden_or_disabled(valid_input, tmp_path, stub_sam2):
+    prompts = _prompts_with_steps(tmp_path, ["close:1", "fill"])
+    inherited, none, override = (tmp_path / f"{n}.ome.zarr" for n in ("i", "n", "o"))
+    assert _mask_cli(valid_input, inherited, prompts) == 0
+    assert _mask_cli(valid_input, none, prompts, "--postprocess", "none") == 0
+    assert _mask_cli(valid_input, override, prompts, "--postprocess", "dilate:1") == 0
+
+    rec = _pp_record(inherited)
+    assert rec["source"] == "prompt_file" and [s["op"] for s in rec["steps"]] == ["close", "fill"]
+    assert _pp_record(none) == {"source": "none", "steps": []}
+    rec = _pp_record(override)
+    assert rec["source"] == "cli" and [s["op"] for s in rec["steps"]] == ["dilate"]
+    dilated = OmeZarrReader(override).read_level(0)
+    assert dilated.sum() > OmeZarrReader(none).read_level(0).sum()
+
+
+def test_invalid_saved_steps_fail_before_segmentation(valid_input, tmp_path, monkeypatch, capsys):
+    from ome_zarr_masker.engine import pipeline
+
+    calls = []
+    monkeypatch.setattr(pipeline, "Sam2Backend", lambda config=None: calls.append(1))
+    prompts = _prompts_with_steps(tmp_path, ["blur:3"])
+    out = tmp_path / "out.ome.zarr"
+    code = _mask_cli(valid_input, out, prompts)
+    err = capsys.readouterr().err
+    assert code == 1 and calls == [] and not out.exists()
+    assert str(prompts) in err and "blur:3" in err

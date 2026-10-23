@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from ..geometry import nearest_index
-from ..postprocess.steps import PostProcessStep
+from ..postprocess.steps import PostProcessError, PostProcessStep, steps_from_json
 
 #: A pyramid level's ``(scale, translation)``, one value per axis.
 LevelGeometry = tuple[tuple[float, ...], tuple[float, ...]]
@@ -226,4 +226,39 @@ def load_prompt_file(path: str | Path) -> PromptSet:
             )
     if not prompts:
         raise PromptError("prompt file contains no prompts")
-    return PromptSet(prompts=prompts, level=level)
+    saved = None
+    if data.get("postprocess") is not None:  # steps saved with the prompts (feature 011)
+        try:
+            saved = steps_from_json(data["postprocess"], f"prompt file {path}", "prompt_file").steps
+        except PostProcessError as exc:
+            raise PromptError(str(exc)) from exc
+    return PromptSet(prompts=prompts, level=level, postprocess=saved)
+
+
+def save_prompt_file(path: str | Path, prompt_set: PromptSet) -> Path:
+    """Write ``prompt_set`` in the prompt-file format, with its saved steps (feature 011).
+
+    Points are grouped by ``obj_id``; the format holds one box per object, so each box is written
+    as its own object with the same ``obj_id``. ``"postprocess"`` is written when the set carries
+    steps (``[]`` for "no steps") and omitted when it is ``None``. :func:`load_prompt_file` reads
+    the result back unchanged.
+    """
+    objects: dict[int, dict] = {}
+    boxes: list[dict] = []
+    for p in prompt_set.prompts:
+        obj = objects.setdefault(p.obj_id, {"obj_id": p.obj_id, "points": []})
+        for (x, y), label in zip(p.point_coords.tolist(), p.point_labels.tolist(), strict=True):
+            obj["points"].append({"frame": p.frame_index, "xy": [x, y], "label": int(label)})
+        if p.box is not None:
+            boxes.append(
+                {"obj_id": p.obj_id, "box": {"frame": p.frame_index, "xyxy": p.box.tolist()}}
+            )
+    data: dict = {
+        "level": prompt_set.level,
+        "objects": [o for o in objects.values() if o["points"]] + boxes,
+    }
+    if prompt_set.postprocess is not None:
+        data["postprocess"] = [str(step) for step in prompt_set.postprocess]
+    path = Path(path)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    return path

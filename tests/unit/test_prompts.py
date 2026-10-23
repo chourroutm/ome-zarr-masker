@@ -250,3 +250,97 @@ def test_resolved_between_meets_performance_budget():
     ps.resolved_between(_geo((2, 2, 2)), _geo((1, 1, 1)), axis_index=0)
     elapsed = time.perf_counter() - start
     assert elapsed < 4e-3, f"resolved_between took {elapsed * 1000:.3f} ms for 500 prompts"
+
+
+# -- steps saved with the prompts (feature 011 US3, T020) -------------------------------------
+
+
+def _write(path, data) -> str:
+    path.write_text(json.dumps(data))
+    return str(path)
+
+
+_OBJ = {"obj_id": 0, "points": [{"frame": 4, "xy": [8, 8], "label": 1}]}
+
+
+def test_saved_steps_are_loaded(tmp_path):
+    from ome_zarr_masker.postprocess.steps import parse_steps
+
+    path = _write(
+        tmp_path / "p.json", {"level": 0, "objects": [_OBJ], "postprocess": ["close:3", "fill"]}
+    )
+    assert load_prompt_file(path).postprocess == parse_steps("close:3,fill").steps
+
+
+@pytest.mark.parametrize("value", [None, "absent"])
+def test_no_saved_steps(tmp_path, value):
+    data = {"level": 0, "objects": [_OBJ]}
+    if value != "absent":
+        data["postprocess"] = value
+    assert load_prompt_file(_write(tmp_path / "p.json", data)).postprocess is None
+
+
+def test_empty_saved_steps_mean_no_steps(tmp_path):
+    path = _write(tmp_path / "p.json", {"level": 0, "objects": [_OBJ], "postprocess": []})
+    assert load_prompt_file(path).postprocess == ()
+
+
+@pytest.mark.parametrize(
+    ("steps", "needle"),
+    [(["blur:3"], "blur:3"), (["default"], "default"), (["none"], "none"), ("fill", "list")],
+)
+def test_invalid_saved_steps_name_the_file(tmp_path, steps, needle):
+    path = _write(tmp_path / "p.json", {"level": 0, "objects": [_OBJ], "postprocess": steps})
+    with pytest.raises(ValueError) as exc:
+        load_prompt_file(path)
+    assert path in str(exc.value) and needle in str(exc.value)
+
+
+def test_save_prompt_file_round_trips(tmp_path):
+    from ome_zarr_masker.postprocess.steps import parse_steps
+    from ome_zarr_masker.prompts.model import Prompt, PromptSet, save_prompt_file
+
+    original = PromptSet(
+        [
+            Prompt(frame_index=3, point_coords=[[1.5, 2.0], [4.0, 5.0]], point_labels=[1, 0]),
+            Prompt(frame_index=3, point_coords=np.empty((0, 2)), point_labels=np.empty((0,), int),
+                   box=[1, 2, 6, 7]),
+            Prompt(frame_index=5, point_coords=np.empty((0, 2)), point_labels=np.empty((0,), int),
+                   box=[0, 0, 3, 3]),
+            Prompt(frame_index=6, point_coords=[[2.0, 2.0]], point_labels=[1], obj_id=1),
+        ],
+        level=2,
+        postprocess=parse_steps("close:200um,fill,largest").steps,
+    )  # fmt: skip
+    path = save_prompt_file(tmp_path / "saved.json", original)
+    data = json.loads(path.read_text())
+    assert data["level"] == 2 and data["postprocess"] == ["close:200um", "fill", "largest"]
+
+    loaded = load_prompt_file(path)
+    assert loaded.level == 2 and loaded.postprocess == original.postprocess
+
+    def summary(ps):
+        out = []
+        for p in ps.prompts:
+            pts = sorted(
+                (tuple(c), int(lbl))
+                for c, lbl in zip(p.point_coords.tolist(), p.point_labels, strict=True)
+            )
+            out += [(p.obj_id, p.frame_index, "pt", c, lbl) for c, lbl in pts]
+            if p.box is not None:
+                out.append((p.obj_id, p.frame_index, "box", tuple(p.box.tolist()), None))
+        return sorted(out)
+
+    assert summary(loaded) == summary(original)
+
+
+def test_save_without_steps_omits_the_key_and_empty_is_kept(tmp_path):
+    from ome_zarr_masker.prompts.model import Prompt, PromptSet, save_prompt_file
+
+    prompts = [Prompt(frame_index=1, point_coords=[[1.0, 1.0]], point_labels=[1])]
+    none = json.loads(
+        save_prompt_file(tmp_path / "a.json", PromptSet(prompts, level=0)).read_text()
+    )
+    assert "postprocess" not in none
+    empty = save_prompt_file(tmp_path / "b.json", PromptSet(prompts, level=0, postprocess=()))
+    assert json.loads(empty.read_text())["postprocess"] == []

@@ -53,7 +53,8 @@ class _RemovedOption(argparse.Action):
 
 
 def _add_postprocess_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--postprocess", default="default", metavar="STEPS", help=_POSTPROCESS_HELP)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--postprocess", default="default", metavar="STEPS", help=_POSTPROCESS_HELP)
     for flag in ("--fill-holes", "--no-fill-holes", "--invert"):
         parser.add_argument(flag, nargs=0, action=_RemovedOption, help=argparse.SUPPRESS)
     for flag in ("--dilate", "--erode"):
@@ -120,6 +121,15 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="allow_download",
         help="Disable weight auto-download",
     )
+    interactive.add_argument(
+        "--prompts",
+        default="prompts.json",
+        help=(
+            "Prompt file: loaded at start if it exists (with its saved post-processing steps), and "
+            "written with the prompts and the panel's steps when you save (default: prompts.json)"
+        ),
+    )
+    _add_postprocess_options(interactive)
     interactive.set_defaults(func=_cmd_interactive)
     return parser
 
@@ -234,6 +244,8 @@ def _cmd_interactive(args: argparse.Namespace) -> int:
             level=args.level,
             model_dir=args.model_dir,
             allow_download=args.allow_download,
+            prompts_path=args.prompts,
+            postprocess=parse_steps(args.postprocess),
         )
         session.launch()
     except ImportError as exc:
