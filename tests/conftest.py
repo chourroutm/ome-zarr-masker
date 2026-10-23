@@ -293,7 +293,13 @@ def moto_s3(monkeypatch):
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
     for var in ("AWS_PROFILE", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN"):
         monkeypatch.delenv(var, raising=False)
+    import requests
+    import s3fs
+
+    requests.post(f"{endpoint}/moto-api/reset", timeout=10)  # moto's state is process-global
+    s3fs.S3FileSystem.clear_instance_cache()  # cached clients point at an earlier endpoint
     yield endpoint
+    s3fs.S3FileSystem.clear_instance_cache()
     server.stop()
 
 

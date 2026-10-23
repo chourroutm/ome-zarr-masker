@@ -122,3 +122,56 @@ def test_export_to_local_path_unchanged(served, tmp_path):
     _, url = served
     out = _session(url).export(tmp_path / "out.ome.zarr")
     assert OmeZarrReader(out).read_level(0).any()
+
+
+# -- US3: MaskResult.save (T023) ---------------------------------------------------------------
+
+
+@pytest.fixture
+def s3_served(moto_s3, tmp_path):
+    import boto3
+
+    from ..conftest import upload_dir_to_s3
+
+    local = write_ome_zarr(tmp_path / "s3in.ome.zarr", _blob_volume())
+    client = boto3.client("s3")
+    client.create_bucket(Bucket="in-bkt")
+    client.create_bucket(Bucket="out-bkt")
+    upload_dir_to_s3(local, "in-bkt", "vol.ome.zarr")
+    return "s3://in-bkt/vol.ome.zarr"
+
+
+def _predict(store):
+    p = OrganMaskPredictor().set_volume(store, level=0)
+    p.add_prompts(frame_index=4, point_coords=[[8.0, 8.0]], point_labels=[1])
+    return p.predict(axes=["z"])
+
+
+def test_mask_result_save_to_s3_equals_cli(s3_served, tmp_path):
+    """C-R-API-1: same store as the CLI with the same inputs and that URL as OUTPUT."""
+    from ..conftest import download_s3_dir
+    from .test_remote_s3 import _prompt_file, assert_same_store
+
+    assert _predict(s3_served).save("s3://out-bkt/api.ome.zarr") == "s3://out-bkt/api.ome.zarr"
+    prompts = _prompt_file(tmp_path)
+    cli = ["mask", s3_served, "s3://out-bkt/cli.ome.zarr", "--prompts", str(prompts)]
+    assert main([*cli, "--level", "0"]) == 0
+    api = download_s3_dir("out-bkt", "api.ome.zarr", tmp_path / "api.ome.zarr")
+    cli_out = download_s3_dir("out-bkt", "cli.ome.zarr", tmp_path / "cli.ome.zarr")
+    assert_same_store(api, cli_out)
+
+
+def test_mask_result_save_rules(s3_served):
+    """C-R-API-2: overwrite and same-store rules; generic HTTPS is not writable."""
+    from ome_zarr_masker.io.writer import WriterError
+
+    result = _predict(s3_served)
+    result.save("s3://out-bkt/r.ome.zarr")
+    with pytest.raises(WriterError, match="already exists"):
+        result.save("s3://out-bkt/r.ome.zarr")
+    result.save("s3://out-bkt/r.ome.zarr", overwrite=True)
+    with pytest.raises(WriterError, match="same store"):
+        result.save("https://in-bkt.s3.amazonaws.com/vol.ome.zarr", overwrite=True)
+    with pytest.raises(RemoteStoreError) as exc:
+        result.save("https://example.org/x.ome.zarr")
+    assert exc.value.cause == "not_writable"

@@ -21,6 +21,7 @@ from pydantic_zarr.v3 import ArraySpec
 from zarr.codecs import BloscCodec
 
 from ..geometry import nearest_index
+from .location import RemoteStoreError, StoreLocation, read_key, remote_errors
 from .reader import OmeZarrReader
 
 #: Default inner chunk shape for output levels whose input level isn't sharded (research R1).
@@ -217,8 +218,38 @@ def _write_level(z, mask, idx, regions, workers, level, report) -> None:
         pool.shutdown(wait=True, cancel_futures=True)
 
 
+def check_output(
+    output_path: str | Path | StoreLocation,
+    overwrite: bool = False,
+    input_location: StoreLocation | None = None,
+) -> StoreLocation:
+    """Check an output location before any work is done (feature 010, C-LOC-5, C-R-CLI-4/6).
+
+    Plain HTTP(S) outputs are refused (not writable). For a remote output: one that names the
+    same store as a remote input is refused, and one whose root ``zarr.json`` exists is refused
+    unless ``overwrite``. Local outputs are only parsed: their checks are unchanged (FR-012).
+    """
+    location = StoreLocation.parse(output_path)
+    if not location.writable:
+        location.open_store(read_only=False)  # raises not_writable, naming the writable forms
+    if not location.is_remote:
+        return location
+    if input_location is not None and location.same_store(input_location):
+        raise WriterError(
+            f"output {location.display} is the same store as the input; choose another output"
+        )
+    if not overwrite:
+        with remote_errors(location):
+            exists = read_key(location.open_store(read_only=False), "zarr.json") is not None
+        if exists:
+            raise WriterError(
+                f"output already exists: {location.display} (use overwrite to replace it)"
+            )
+    return location
+
+
 def write_mask(
-    output_path: str | Path,
+    output_path: str | Path | StoreLocation,
     mask: np.ndarray,
     run_level: int,
     reader: OmeZarrReader,
@@ -228,7 +259,7 @@ def write_mask(
     workers: int | None = None,
     progress: Callable[[str], None] | None = None,
     on_level: Callable[[LevelLayout, int, int, str], None] | None = None,
-) -> Path:
+) -> Path | str:
     """Write ``mask`` (binary, at ``run_level`` shape) as OME-Zarr v0.5 (FR-002, FR-013, FR-014).
 
     The output has the same levels, shapes, axes and transforms as the input. Each level is a
@@ -237,53 +268,31 @@ def write_mask(
     in memory whole. ``workers`` overrides the budget-derived number of shards written at once;
     ``progress`` receives per-level messages; ``on_level(layout, n_shards, workers, source)`` is
     called as each level starts. Nothing replaces an existing output until the write succeeds.
+
+    ``output_path`` may also be an S3, GCS or Azure URL (feature 010): the store is written in
+    place with its root ``zarr.json`` put last, so a failed write never reads as a store
+    (research R5). Returns the local ``Path``, or the URL as given for a remote output.
     """
     if workers is not None:
         _check_workers(workers)
-    output_path = Path(output_path)
+    location = StoreLocation.parse(output_path)
+    if location.is_remote:
+        return _write_remote(
+            location, mask, run_level, reader, run_record, overwrite, workers, progress, on_level
+        )
+    output_path = location.path
     if output_path.exists() and not overwrite:
         raise WriterError(f"output already exists: {output_path} (use overwrite to replace it)")
 
-    def report(msg: str) -> None:
-        if progress is not None:
-            progress(msg)
-
     mask = (np.asarray(mask) != 0).astype(np.uint8)
-    axis_names = list(reader.axes)
     layouts = plan_layouts(reader)
-    scales, translations = _level_transforms(reader)
-    run_scale, run_trans = reader.level_transform(run_level)
-
     tmp_path = output_path.with_name(output_path.name + ".tmp")
     if tmp_path.exists():
         shutil.rmtree(tmp_path)
     try:
-        image = Image.new(
-            array_specs=[_array_spec(lay, axis_names) for lay in layouts],
-            paths=[str(lay.level) for lay in layouts],
-            axes=[Axis(name=name, type="space") for name in axis_names],
-            scales=scales,
-            translations=translations,
-        )
-        image.to_zarr(zarr.storage.LocalStore(str(tmp_path)), path="")
-        for lay in layouts:
-            scale, trans = reader.level_transform(lay.level)
-            idx = _nn_indices(mask.shape, run_scale, run_trans, lay.shape, scale, trans)
-            n_workers = resolve_workers(workers, lay)
-            source = "user" if workers is not None else "budget"
-            regions = list(_shard_regions(lay))
-            if workers is None:
-                n_workers = min(n_workers, len(regions))  # report what can actually run
-            if on_level is not None:
-                on_level(lay, len(regions), n_workers, source)
-            report(
-                f"writing level {lay.level} {lay.shape}: {len(regions)} shards "
-                f"({lay.chunks} chunks in {lay.shards} shards, workers={n_workers} ({source}))"
-            )
-            z = zarr.open_array(store=str(tmp_path), path=str(lay.level), mode="r+")
-            _write_level(z, mask, idx, regions, n_workers, lay.level, report)
-        record = {**run_record, "output_layout": [_layout_record(lay) for lay in layouts]}
-        (tmp_path / "run_record.json").write_text(json.dumps(record, indent=2))
+        _image_model(reader, layouts).to_zarr(zarr.storage.LocalStore(str(tmp_path)), path="")
+        _write_levels(str(tmp_path), mask, run_level, reader, layouts, workers, progress, on_level)
+        (tmp_path / "run_record.json").write_text(_record_json(run_record, layouts))
 
         if output_path.exists():
             shutil.rmtree(output_path)
@@ -293,3 +302,102 @@ def write_mask(
             shutil.rmtree(tmp_path, ignore_errors=True)
         raise
     return output_path
+
+
+def _image_model(reader: OmeZarrReader, layouts: list[LevelLayout]) -> Image:
+    """The output's OME-Zarr metadata: the input's levels, axes and transforms, mask arrays."""
+    axis_names = list(reader.axes)
+    scales, translations = _level_transforms(reader)
+    return Image.new(
+        array_specs=[_array_spec(lay, axis_names) for lay in layouts],
+        paths=[str(lay.level) for lay in layouts],
+        axes=[Axis(name=name, type="space") for name in axis_names],
+        scales=scales,
+        translations=translations,
+    )
+
+
+def _record_json(run_record: dict, layouts: list[LevelLayout]) -> str:
+    record = {**run_record, "output_layout": [_layout_record(lay) for lay in layouts]}
+    return json.dumps(record, indent=2)
+
+
+def _write_levels(store, mask, run_level, reader, layouts, workers, progress, on_level) -> None:
+    """Write every level's shards into ``store`` (a local path string or a remote store)."""
+
+    def report(msg: str) -> None:
+        if progress is not None:
+            progress(msg)
+
+    run_scale, run_trans = reader.level_transform(run_level)
+    for lay in layouts:
+        scale, trans = reader.level_transform(lay.level)
+        idx = _nn_indices(mask.shape, run_scale, run_trans, lay.shape, scale, trans)
+        n_workers = resolve_workers(workers, lay)
+        source = "user" if workers is not None else "budget"
+        regions = list(_shard_regions(lay))
+        if workers is None:
+            n_workers = min(n_workers, len(regions))  # report what can actually run
+        if on_level is not None:
+            on_level(lay, len(regions), n_workers, source)
+        report(
+            f"writing level {lay.level} {lay.shape}: {len(regions)} shards "
+            f"({lay.chunks} chunks in {lay.shards} shards, workers={n_workers} ({source}))"
+        )
+        z = zarr.open_array(store=store, path=str(lay.level), mode="r+")
+        _write_level(z, mask, idx, regions, n_workers, lay.level, report)
+
+
+def _write_remote(
+    location, mask, run_level, reader, run_record, overwrite, workers, progress, on_level
+) -> str:
+    """Commit-last write to an object store (research R5, FR-009).
+
+    The root ``zarr.json`` is what makes the prefix a store: an existing one is deleted first on
+    overwrite, the new one is held back while the levels and run record are written, and put
+    last. On failure, what this write created is removed (best effort); either way no root
+    ``zarr.json`` is left, so nothing reads the output as a complete mask.
+    """
+    from zarr.core.buffer import default_buffer_prototype
+    from zarr.core.sync import sync
+
+    check_output(location, overwrite, reader.location)
+    mask = (np.asarray(mask) != 0).astype(np.uint8)
+    layouts = plan_layouts(reader)
+    owned = [str(lay.level) for lay in layouts]
+
+    def put(store, key: str, data: bytes) -> None:
+        sync(store.set(key, default_buffer_prototype().buffer.from_bytes(data)))
+
+    with remote_errors(location):
+        store = location.open_store(read_only=False)
+        if read_key(store, "zarr.json") is not None:  # overwrite (checked above): uncommit first
+            sync(store.delete("zarr.json"))
+            sync(store.delete_dir(""))
+    try:
+        with remote_errors(location):
+            for prefix in owned:  # leftovers of an earlier failed write (no root document)
+                sync(store.delete_dir(prefix))
+            sync(store.delete("run_record.json"))
+            _image_model(reader, layouts).to_zarr(store, path="")
+            root = read_key(store, "zarr.json")
+            sync(store.delete("zarr.json"))
+            _write_levels(store, mask, run_level, reader, layouts, workers, progress, on_level)
+            put(store, "run_record.json", _record_json(run_record, layouts).encode())
+            put(store, "zarr.json", root)
+    except Exception as exc:
+        try:
+            sync(store.delete("zarr.json"))
+            for prefix in owned:
+                sync(store.delete_dir(prefix))
+            sync(store.delete("run_record.json"))
+        except Exception:  # noqa: BLE001 - best effort; the root document is already absent
+            pass
+        if isinstance(exc, (RemoteStoreError, WriterError)):
+            raise
+        raise RemoteStoreError(
+            f"{location.display}: write failed ({' '.join(str(exc).split())[:300]})",
+            cause="network",
+            location=location.display,
+        ) from exc
+    return location.raw

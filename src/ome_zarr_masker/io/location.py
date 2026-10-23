@@ -331,7 +331,8 @@ def filesystem_for(location: StoreLocation):
     if override is not None:
         return override(location)
     kind = location.kind
-    common = {"asynchronous": True, "skip_instance_cache": True}
+    # fsspec caches instances by these arguments: one client (and HTTP session) per provider
+    common = {"asynchronous": True}
     try:
         if kind == "s3":
             import s3fs
@@ -359,8 +360,7 @@ def filesystem_for(location: StoreLocation):
             import aiohttp  # noqa: F401 - HTTPFileSystem needs it; fail with a clear extra name
             from fsspec.implementations import http
 
-            # no credentials involved: share fsspec's cached instance (and its HTTP session)
-            return http.HTTPFileSystem(asynchronous=True)
+            return http.HTTPFileSystem(**common)
     except ImportError as exc:
         raise _missing(location, exc) from exc
     raise ValueError(f"no filesystem for a {kind} location")

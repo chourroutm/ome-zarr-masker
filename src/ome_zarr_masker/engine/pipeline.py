@@ -14,7 +14,7 @@ from ..config import RunConfig
 from ..io.location import StoreLocation
 from ..io.reader import OmeZarrReader, ReaderError
 from ..io.validate import validate_ome_zarr
-from ..io.writer import write_mask
+from ..io.writer import check_output, write_mask
 from ..postprocess.morphology import postprocess_mask
 from ..prompts.model import Prompt, PromptError, PromptSet
 from ..sam2 import Sam2Backend
@@ -254,14 +254,19 @@ def run_masking(
     run_id: str | None = None,
     workers: int | None = None,
     on_level=None,
-) -> Path:
+) -> Path | str:
     """Run an end-to-end masking pipeline and write an OME-Zarr v0.5 mask.
 
     ``reader``/``backend`` may be injected; otherwise they are constructed from ``input_path``/
     ``config``. Segmentation always uses SAM2. ``run_id`` is embedded in the run record for log
     correlation. ``workers``/``on_level`` are passed to the writer (feature 009): shards written in
     parallel, and a per-level callback (used by the CLI's input log).
+
+    Either store may be a URL (feature 010). The output is checked before any work: not writable,
+    same store as the input, or an existing remote store without overwrite all fail up front.
+    Returns the output ``Path``, or the URL as given for a remote output.
     """
+    check_output(output_path, config.overwrite, StoreLocation.parse(input_path))
     comp = compute_mask(
         input_path,
         prompts,
@@ -273,7 +278,7 @@ def run_masking(
     )
     if progress is not None:
         progress("writing output")
-    write_mask(
+    return write_mask(
         output_path,
         comp.consensus,
         comp.level,
@@ -284,7 +289,6 @@ def run_masking(
         progress=progress,
         on_level=on_level,
     )
-    return Path(output_path)
 
 
 __all__ = [

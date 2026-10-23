@@ -46,13 +46,16 @@ class MaskResult:
         *,
         workers: int | None = None,
         progress: Callable[[str], None] | None = None,
-    ) -> Path:
+    ) -> Path | str:
         """Write OME-Zarr v0.5 with the same levels as the input, embedding the run record.
 
         Refuses to overwrite an existing store unless ``overwrite=True`` (FR-013). Each level is
         written one compressed shard at a time (feature 009). ``workers`` sets how many shards are
         written in parallel (default: as many as fit in an 8 GiB budget); ``progress`` receives
         per-level messages, including the worker count used.
+
+        ``store_path`` may be an S3, GCS or Azure URL (feature 010); the URL is returned as given.
+        A remote output can't be the input's store, and plain HTTP(S) URLs are not writable.
         """
         return write_mask(
             store_path,
