@@ -50,3 +50,13 @@ back identical to a local output.
 
 `uv run ruff check src tests`, `uv run ruff format --check src tests`, `uv run pytest -q`: every
 existing local-path test passes unchanged (SC-004).
+
+## Validation record (2026-10-23)
+
+- Steps 1–5 and 7 on the login node: `uv run pytest -m "not real_backend and not slow"`: 255
+  passed, 4 skipped (the 3 opt-in `remote_live` tests and one existing skip); ruff check and
+  format clean.
+- Slow and `real_backend` tests on a GPU node (`salloc -p mit_normal_gpu --gres=gpu:1`): 48 passed
+  after the change, the same as the 48 before it, including the feature 009 writer performance and
+  level-speed tests (no local regression, SC-004).
+- Step 6 (live clouds) not run: no test buckets configured.

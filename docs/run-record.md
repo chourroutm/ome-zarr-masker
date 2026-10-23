@@ -20,7 +20,7 @@ output.ome.zarr/
 | Field | Type | Meaning |
 |-------|------|---------|
 | `run_id` | string | Identifier of this invocation; matches the input log `<log-dir>/<run_id>.log`. |
-| `input` | string | Path to the input OME-Zarr v0.5 store. |
+| `input` | string | The input OME-Zarr v0.5 store: its path, or for a remote store its URL in canonical form (`s3://bucket/key`, `gs://bucket/key`, `az://container/key (account <name>)`, or the HTTP(S) URL). Never contains credentials: URLs carrying them are rejected. |
 | `level` | int | Resolved multiscale level the run operated on (the coarsest level if the request used the default). |
 | `config.backend` | string | Always `"sam2"`; recorded for provenance (SAM2 is the only segmentation backend). |
 | `config.level` | int | Requested level (`-1` means "coarsest"); `level` above is the resolved value. |

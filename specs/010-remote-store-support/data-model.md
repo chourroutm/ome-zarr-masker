@@ -48,8 +48,9 @@ missing_dependency, credentials_in_url}` and `location: str` (the `display` form
 
 - **Run record** (`run_record.json`, docs/run-record.md): `input` holds `StoreLocation.display`
   (unchanged for local paths). No new fields. Credentials cannot appear (rejected at parse time).
-- **Input log** (feature 002): input/output arguments are logged as given; since credential-bearing
-  URLs are rejected before the run starts, no redaction step is needed.
+- **Input log** (feature 002): input/output arguments are logged as given, except that URL
+  credentials, query strings and fragments are removed (`redact_url`): the log is written before a
+  credential-bearing URL is rejected, so it would otherwise record it (FR-011).
 
 ## Write lifecycle of a remote output (research R5)
 

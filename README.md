@@ -27,6 +27,8 @@ identical results for identical inputs.
 - Masks are written shard by shard, compressed, in bounded memory -- even for full-resolution levels
   far larger than RAM (see [Output](#output)).
 - Every output embeds a `run_record.json` for reproducibility (see [docs/run-record.md](docs/run-record.md)).
+- Inputs and outputs can be remote: read over HTTP(S), read and write S3, Google Cloud Storage and
+  Azure Blob Storage, fetching only the level a run needs (see [Remote stores](#remote-stores)).
 
 ## Install
 
@@ -36,6 +38,7 @@ Python 3.11+.
 pip install -e ".[sam2]"                 # SAM2 (torch + sam2)
 pip install -e ".[interactive]"          # optional napari viewer
 pip install -e ".[dev]"                  # tests + linting
+pip install -e ".[remote]"               # remote stores: or just [s3], [gcs], [azure], [http]
 ```
 
 OME-Zarr v0.5 input validation is provided by the bundled `ome-zarr-models` dependency and runs
@@ -113,6 +116,45 @@ whole level in memory; it works shard by shard within an 8 GiB budget (`--worker
 parallelism). With `--verbose`, progress is reported per level. `run_record.json` lists each level's
 layout under `output_layout`.
 
+### Remote stores
+
+`INPUT` and `OUTPUT` (and the Python API's store arguments) may be URLs instead of local paths:
+
+```bash
+ome-zarr-masker mask https://example.org/data/brain.ome.zarr mask.ome.zarr --prompts p.json
+ome-zarr-masker mask s3://my-bucket/brain.ome.zarr s3://my-bucket/brain-mask.ome.zarr --prompts p.json
+ome-zarr-masker mask gs://my-bucket/brain.ome.zarr mask.ome.zarr --prompts p.json
+ome-zarr-masker mask az://container/brain.ome.zarr az://container/mask.ome.zarr --prompts p.json
+```
+
+| Form | Read | Write |
+|------|------|-------|
+| `s3://bucket/key`, `https://bucket.s3[.region].amazonaws.com/key`, `https://s3.region.amazonaws.com/bucket/key` | yes | yes |
+| `gs://bucket/key`, `https://storage.googleapis.com/bucket/key` | yes | yes |
+| `az://container/path`, `abfs://container@account.dfs.core.windows.net/path`, `https://account.blob.core.windows.net/container/path` | yes | yes |
+| any other `http(s)://` URL | yes | no |
+
+The full list is in
+[specs/010-remote-store-support/contracts/store-location.md](specs/010-remote-store-support/contracts/store-location.md).
+Anything without `<scheme>://` is a local path, exactly as before. Install the extra for each
+provider you use: `[s3]`, `[gcs]`, `[azure]`, `[http]`, or `[remote]` for all of them.
+
+- **Only what's needed is read**: the metadata and the selected level, never the whole store.
+- **Credentials come from each provider's standard configuration**: S3 uses the AWS chain
+  (environment, `AWS_PROFILE`/config files, instance role; `AWS_ENDPOINT_URL` for S3-compatible
+  services); GCS uses application default credentials; Azure uses `AZURE_STORAGE_*` variables, a
+  service principal or `az login` (for `az://`, set `AZURE_STORAGE_ACCOUNT_NAME`). With nothing
+  configured, access is anonymous, so public data needs no setup. There are no credential flags,
+  and URLs carrying credentials or signed query strings (`user:pass@`, `?sig=...`) are rejected, so
+  no secret can reach a log or run record.
+- **Writing** follows the local rules (`--overwrite` to replace an existing store). The root
+  `zarr.json` is written last, so a failed write never reads as a valid store. Unlike a local
+  output, a failed **remote overwrite** has already removed the previous store.
+- Input and output naming the same remote store are rejected. Errors say whether a location was not
+  found, access was denied or the network failed, separately from "not valid OME-Zarr v0.5".
+- The interactive session reads remote inputs, but exports only to local paths; write remote output
+  with `mask` or `MaskResult.save`.
+
 ### Input logging
 
 Every invocation -- CLI or API -- writes one plain-text log file to `<log-dir>/<run-id>.log`
@@ -160,6 +202,7 @@ ome-zarr-masker interactive input.ome.zarr --level 3
 Place landmarks on the points layer -- new points default to positive (green); select one or more
 and press `n` to mark them negative/exclusion (red), or `y` to mark them positive again. Press `p`
 to preview the mask and `e` to export it. The session runs on the same engine as the CLI and API.
+`INPUT` may be a remote URL (see [Remote stores](#remote-stores)); exports are local.
 
 ## Development
 
@@ -172,3 +215,8 @@ pytest                       # add -m "not slow" to skip the timing/benchmark te
 Tests that exercise real segmentation are marked `real_backend` and are skipped unless torch + sam2
 (and, for the interactive smoke test, napari) are installed and a GPU with SAM2 weights is
 available. There is no CPU-only stand-in; these tests verify the actual, shipped SAM2 path.
+
+Remote-store tests run offline (a local HTTP server, moto's in-process S3 and an in-memory
+filesystem). Tests against real buckets are marked `remote_live` and run only when
+`OME_ZARR_MASKER_TEST_S3_URL`, `OME_ZARR_MASKER_TEST_GCS_URL` or `OME_ZARR_MASKER_TEST_AZURE_URL`
+names a writable test prefix: `pytest -m remote_live`.
