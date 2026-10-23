@@ -135,12 +135,12 @@ root with `uv run --no-sync`.
 
 ### Tests for User Story 4 (write first, must fail)
 
-- [ ] T029 [P] [US4] Add to `tests/integration/test_postprocess_prompts.py`: `--postprocess-file steps.json` (`{"postprocess": ["close:1", "fill"]}`) equals `--postprocess close:1,fill` (record source `file`); a prompt file with saved steps passed as `--postprocess-file` works; giving both options is a usage error (exit 2) for `mask` and `interactive`; missing, unreadable or malformed files (no `"postprocess"` key, not a list, invalid step) exit 1 before segmentation naming the file; the same steps via CLI, file, prompt file, `predict(postprocess=...)` and `InteractiveSession.export` give identical masks (SC-005, C-API-PP-1); rerunning `mask` with `--postprocess` built from the record's `[s["op"] + (":" + s["radius"] if s["radius"] else "") ...]` reproduces the mask exactly (SC-004); the input log lists the steps and their source
+- [X] T029 [P] [US4] Add to `tests/integration/test_postprocess_prompts.py`: `--postprocess-file steps.json` (`{"postprocess": ["close:1", "fill"]}`) equals `--postprocess close:1,fill` (record source `file`); a prompt file with saved steps passed as `--postprocess-file` works; giving both options is a usage error (exit 2) for `mask` and `interactive`; missing, unreadable or malformed files (no `"postprocess"` key, not a list, invalid step) exit 1 before segmentation naming the file; the same steps via CLI, file, prompt file, `predict(postprocess=...)` and `InteractiveSession.export` give identical masks (SC-005, C-API-PP-1); rerunning `mask` with `--postprocess` built from the record's `[s["op"] + (":" + s["radius"] if s["radius"] else "") ...]` reproduces the mask exactly (SC-004); the input log lists the steps and their source
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] In `src/ome_zarr_masker/postprocess/steps.py` add `load_postprocess_file(path) -> PostProcessSpec` (source `file`, errors prefixed by the path); in `src/ome_zarr_masker/cli.py` add `--postprocess-file` to the mutually exclusive groups of `mask` and `interactive` and use it when given; in `src/ome_zarr_masker/input_log.py` (via `record_config`) make sure the recorded config includes the post-processing source and steps. Make T029 pass
-- [ ] T031 [US4] Run lint and the login-node suite; fix until green. Commit "feat(cli): read post-processing steps from a file (011 US4)"
+- [X] T030 [US4] In `src/ome_zarr_masker/postprocess/steps.py` add `load_postprocess_file(path) -> PostProcessSpec` (source `file`, errors prefixed by the path); in `src/ome_zarr_masker/cli.py` add `--postprocess-file` to the mutually exclusive groups of `mask` and `interactive` and use it when given; in `src/ome_zarr_masker/input_log.py` (via `record_config`) make sure the recorded config includes the post-processing source and steps. Make T029 pass
+- [X] T031 [US4] Run lint and the login-node suite; fix until green. Commit "feat(cli): read post-processing steps from a file (011 US4)"
 
 **Checkpoint**: All stories work independently and together
 

@@ -117,3 +117,136 @@ def test_interactive_cli_rejects_bad_steps_before_opening(store, tmp_path, monke
     assert main(["interactive", str(store), "--prompts", str(p), "--postprocess", "fill"]) == 0
     (session,) = launched
     assert session.prompts_path == p and session.postprocess.text() == "fill"
+
+
+# -- US4: post-processing files, parity, reproducibility (T029) ---------------------------------
+
+
+STEPS = ["close:1", "fill", "largest", "margin:1"]
+
+
+def _prompt_file(path, steps=None):
+    data = {"level": 0, "objects": [{"points": [{"frame": 8, "xy": [12, 12], "label": 1}]}]}
+    if steps is not None:
+        data["postprocess"] = steps
+    path.write_text(json.dumps(data))
+    return path
+
+
+def _cli(store, out, prompts, *extra):
+    return main(["mask", str(store), str(out), "--prompts", str(prompts), "--level", "0", *extra])
+
+
+def _record(out) -> dict:
+    return json.loads((out / "run_record.json").read_text())["config"]["postprocess"]
+
+
+def test_postprocess_file_equals_command_line(store, tmp_path):
+    prompts = _prompt_file(tmp_path / "p.json")
+    steps_file = tmp_path / "steps.json"
+    steps_file.write_text(json.dumps({"postprocess": STEPS}))
+    a, b = tmp_path / "a.ome.zarr", tmp_path / "b.ome.zarr"
+    assert _cli(store, a, prompts, "--postprocess", ",".join(STEPS)) == 0
+    assert _cli(store, b, prompts, "--postprocess-file", str(steps_file)) == 0
+    np.testing.assert_array_equal(_level0(a), _level0(b))
+    assert _record(b)["source"] == "file"
+    assert _record(a)["steps"] == _record(b)["steps"]
+
+
+def test_prompt_file_works_as_postprocess_file(store, tmp_path):
+    saved = _prompt_file(tmp_path / "saved.json", STEPS)
+    plain = _prompt_file(tmp_path / "plain.json")
+    a, b = tmp_path / "a.ome.zarr", tmp_path / "b.ome.zarr"
+    assert _cli(store, a, plain, "--postprocess-file", str(saved)) == 0
+    assert _cli(store, b, plain, "--postprocess", ",".join(STEPS)) == 0
+    np.testing.assert_array_equal(_level0(a), _level0(b))
+
+
+@pytest.mark.parametrize("command", ["mask", "interactive"])
+def test_postprocess_and_file_are_mutually_exclusive(store, tmp_path, command, capsys):
+    args = [command, str(store)]
+    if command == "mask":
+        args += [str(tmp_path / "o.ome.zarr"), "--prompts", str(_prompt_file(tmp_path / "p.json"))]
+    with pytest.raises(SystemExit) as exc:
+        main([*args, "--postprocess", "fill", "--postprocess-file", "x.json"])
+    assert exc.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("content", "needle"),
+    [
+        (None, "cannot read"),
+        ("{not json", "cannot read"),
+        ('{"steps": ["fill"]}', '"postprocess"'),
+        ('{"postprocess": "fill"}', "list"),
+        ('{"postprocess": ["blur:3"]}', "blur:3"),
+    ],
+)
+def test_bad_postprocess_files_fail_before_segmentation(
+    store, tmp_path, monkeypatch, capsys, content, needle
+):
+    from ome_zarr_masker.engine import pipeline
+
+    calls = []
+    monkeypatch.setattr(pipeline, "Sam2Backend", lambda config=None: calls.append(1))
+    steps_file = tmp_path / "steps.json"
+    if content is not None:
+        steps_file.write_text(content)
+    out = tmp_path / "out.ome.zarr"
+    code = _cli(
+        store, out, _prompt_file(tmp_path / "p.json"), "--postprocess-file", str(steps_file)
+    )
+    err = capsys.readouterr().err
+    assert code == 1 and calls == [] and not out.exists()
+    assert str(steps_file) in err and needle in err
+
+
+def test_same_steps_from_every_source_give_the_same_mask(store, tmp_path):
+    """SC-005: command line, file, prompt file, Python API and interactive session."""
+    plain = _prompt_file(tmp_path / "plain.json")
+    saved = _prompt_file(tmp_path / "saved.json", STEPS)
+    steps_file = tmp_path / "steps.json"
+    steps_file.write_text(json.dumps({"postprocess": STEPS}))
+    outs = {
+        "cli": (plain, ["--postprocess", ",".join(STEPS)]),
+        "file": (plain, ["--postprocess-file", str(steps_file)]),
+        "prompt_file": (saved, []),
+    }
+    masks = {}
+    for name, (prompts, extra) in outs.items():
+        out = tmp_path / f"{name}.ome.zarr"
+        assert _cli(store, out, prompts, *extra) == 0
+        masks[name] = _level0(out)
+
+    p = OrganMaskPredictor().set_volume(store, level=0)
+    p.add_prompts(frame_index=8, point_coords=[[12.0, 12.0]], point_labels=[1])
+    masks["api"] = OmeZarrReader(
+        p.predict(postprocess=STEPS).save(tmp_path / "api.ome.zarr")
+    ).read_level(0)
+    session = InteractiveSession(store, level=0, prompts_path=saved)
+    masks["session"] = _level0(session.export(tmp_path / "session.ome.zarr"))
+
+    reference = masks.pop("cli")
+    for name, mask in masks.items():
+        np.testing.assert_array_equal(mask, reference, err_msg=name)
+
+
+def test_rerun_from_the_record_reproduces_the_mask(store, tmp_path):
+    """SC-004: the recorded steps, pasted back into --postprocess, give the same mask."""
+    prompts = _prompt_file(tmp_path / "p.json")
+    first = tmp_path / "first.ome.zarr"
+    assert _cli(store, first, prompts, "--postprocess", "close:1, FILL ,largest,margin:1") == 0
+    rec = _record(first)
+    again = ",".join(s["op"] + (f":{s['radius']}" if s["radius"] else "") for s in rec["steps"])
+    second = tmp_path / "second.ome.zarr"
+    assert _cli(store, second, prompts, "--postprocess", again) == 0
+    np.testing.assert_array_equal(_level0(first), _level0(second))
+    assert _record(second)["steps"] == rec["steps"]
+
+
+def test_input_log_lists_steps_and_source(store, tmp_path):
+    prompts = _prompt_file(tmp_path / "p.json", STEPS)
+    assert _cli(store, tmp_path / "o.ome.zarr", prompts) == 0
+    log = "\n".join(f.read_text() for f in (tmp_path / "_logs").rglob("*.log"))
+    assert "prompt_file" in log and "margin" in log

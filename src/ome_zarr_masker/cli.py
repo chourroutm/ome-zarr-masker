@@ -6,7 +6,12 @@ import argparse
 import sys
 
 from .config import COARSEST_LEVEL, LogConfig, RunConfig
-from .postprocess.steps import PostProcessError, parse_steps
+from .postprocess.steps import (
+    PostProcessError,
+    PostProcessSpec,
+    load_postprocess_file,
+    parse_steps,
+)
 from .prompts.model import PromptError, load_prompt_file
 
 _LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
@@ -55,10 +60,29 @@ class _RemovedOption(argparse.Action):
 def _add_postprocess_options(parser: argparse.ArgumentParser) -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--postprocess", default="default", metavar="STEPS", help=_POSTPROCESS_HELP)
+    group.add_argument(
+        "--postprocess-file",
+        default=None,
+        metavar="FILE",
+        help=(
+            'Read the post-processing steps from a JSON file: {"postprocess": ["close:3", "fill"]} '
+            "(a prompt file with saved steps works too)"
+        ),
+    )
     for flag in ("--fill-holes", "--no-fill-holes", "--invert"):
         parser.add_argument(flag, nargs=0, action=_RemovedOption, help=argparse.SUPPRESS)
     for flag in ("--dilate", "--erode"):
         parser.add_argument(flag, nargs="?", action=_RemovedOption, help=argparse.SUPPRESS)
+
+
+def _postprocess_spec(args: argparse.Namespace) -> PostProcessSpec:
+    """The steps from --postprocess-file or --postprocess (errors name their source)."""
+    if args.postprocess_file is not None:
+        return load_postprocess_file(args.postprocess_file)
+    try:
+        return parse_steps(args.postprocess)
+    except PostProcessError as exc:
+        raise PostProcessError(f"--postprocess: {exc}") from exc
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -179,10 +203,12 @@ def _cmd_mask(args: argparse.Namespace) -> int:
             return 1
 
         try:
-            postprocess = parse_steps(args.postprocess)
+            # `default` takes the prompt file's saved steps (feature 011), resolved here so the
+            # log records the steps and their source
+            postprocess = _postprocess_spec(args).inherit(prompts.postprocess)
         except PostProcessError as exc:
             log.mark_failed(str(exc))
-            print(f"error: --postprocess: {exc}", file=sys.stderr)
+            print(f"error: {exc}", file=sys.stderr)
             return 1
 
         try:
@@ -245,7 +271,7 @@ def _cmd_interactive(args: argparse.Namespace) -> int:
             model_dir=args.model_dir,
             allow_download=args.allow_download,
             prompts_path=args.prompts,
-            postprocess=parse_steps(args.postprocess),
+            postprocess=_postprocess_spec(args),
         )
         session.launch()
     except ImportError as exc:
