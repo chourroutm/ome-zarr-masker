@@ -21,6 +21,7 @@ import numpy as np
 from .config import COARSEST_LEVEL, LogConfig, PostProcessConfig, RunConfig
 from .engine.pipeline import compute_mask
 from .input_log import log_invocation
+from .io.location import StoreLocation
 from .io.reader import OmeZarrReader
 from .io.validate import validate_ome_zarr
 from .io.writer import write_mask
@@ -90,8 +91,9 @@ class OrganMaskPredictor:
 
         Setting a new volume clears any previously added prompts (as SAM resets on a new image).
         """
-        validate_ome_zarr(store_path)  # FR-001
-        reader = OmeZarrReader(store_path)
+        location = StoreLocation.parse(store_path)  # a local path or URL (feature 010)
+        validate_ome_zarr(location)  # FR-001
+        reader = OmeZarrReader(location)
         self._level = reader.resolve_level(level)  # validates the level (FR-003)
         self._reader = reader
         self._store_path = str(store_path)

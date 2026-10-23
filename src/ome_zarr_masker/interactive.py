@@ -14,6 +14,7 @@ import numpy as np
 
 from .api import MaskResult, OrganMaskPredictor
 from .config import COARSEST_LEVEL, PostProcessConfig
+from .io.location import RemoteStoreError, StoreLocation
 from .io.reader import OmeZarrReader
 
 
@@ -63,6 +64,7 @@ class InteractiveSession:
         predictor: OrganMaskPredictor | None = None,
     ):
         self._store_path = str(store_path)
+        self._location = StoreLocation.parse(store_path)  # local path or URL (feature 010)
         self._level = level
         self._predictor = predictor or OrganMaskPredictor(
             model_dir=model_dir, allow_download=allow_download
@@ -161,13 +163,25 @@ class InteractiveSession:
         single-slice/few-slices preview may only cover a partial ``frame_range``, and exporting
         that partial result instead of the full volume would be silently wrong. Preserves whatever
         axes/direction/combine_rule/postprocess the last ``preview()`` call used, if any.
+
+        ``output_path`` must be local: remote output is refused before anything is computed
+        (feature 010, FR-004); ``mask`` and :meth:`MaskResult.save` write to remote stores.
         """
+        destination = StoreLocation.parse(output_path)
+        if destination.is_remote:
+            raise RemoteStoreError(
+                f"cannot export to {destination.display}: the interactive session writes local "
+                "outputs only; remote output is supported by the `mask` command and "
+                "MaskResult.save",
+                cause="not_writable",
+                location=destination.display,
+            )
         self.preview(frame_range=None, **self._last_preview_kwargs)
         return self._preview.save(output_path, overwrite=overwrite)
 
     def read_volume(self) -> np.ndarray:
         """The run-level volume, for display."""
-        reader = OmeZarrReader(self._store_path)
+        reader = OmeZarrReader(self._location)
         return reader.read_level(reader.resolve_level(self._level))
 
     # -- napari view ------------------------------------------------------
