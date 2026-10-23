@@ -21,7 +21,9 @@ identical results for identical inputs.
   intersection consensus. In multi-axis runs you prompt one plane and the other axes are seeded
   automatically.
 - Pick any pyramid (binning) level; the coarsest level is the default and is faster.
-- Optional morphological post-processing (fill-holes on by default; dilation/erosion off).
+- Ordered post-processing (`--postprocess close:3,fill,largest,margin:200um`): closing, opening,
+  dilation, erosion, hole filling, largest component, margin and inversion, in the order you give,
+  with radii in voxels or physical units (see [Post-processing](#post-processing)).
 - SAM-like Python API and an interactive napari session.
 - Out-of-core intermediates (on-disk memmap frame stack and vote accumulator) keep RAM bounded.
 - Masks are written shard by shard, compressed, in bounded memory -- even for full-resolution levels
@@ -72,8 +74,8 @@ Key options:
 | `--axes AXES` | `z` | Comma-separated sweep axes; the first is the prompted axis. |
 | `--direction {forward,forward_reverse}` | `forward` | Propagation mode. |
 | `--combine {majority,union,intersection}` | `majority` | Consensus across sweeps. |
-| `--fill-holes / --no-fill-holes` | on | Fill interior holes. |
-| `--dilate INT` / `--erode INT` | `0` | Morphology radii (voxels). |
+| `--postprocess STEPS` | `default` | Ordered post-processing steps (see [Post-processing](#post-processing)); `default` uses the prompt file's saved steps, or none. |
+| `--postprocess-file FILE` | | Read the steps from a JSON file instead (`{"postprocess": [...]}`). |
 | `--overwrite` | off | Replace an existing output. |
 | `--workers INT` | automatic | Output shards written in parallel (default: as many as fit in an 8 GiB write budget, at most the CPU count). |
 | `--log-dir PATH` | `./ome_zarr_masker_logs` | Directory for per-invocation input logs. |
@@ -98,6 +100,56 @@ Key options:
 match the `--level` the run itself uses: coordinates are automatically converted to whichever level
 `mask` actually runs at. `label` is `1` for a positive (include) point and `0` for a negative
 (exclude) point. At least one positive point or a box is required.
+
+`frame` is a plane along the first `--axes` axis, and points may sit on several frames. In
+multi-axis runs, a sweep can briefly lose the object for a few frames and leave thin planes of
+missing voxels; placing prompts on several frames spread through the object (and adding `close` to
+the post-processing) reduces these dropouts.
+
+An optional `"postprocess"` list saves post-processing steps with the prompts (the interactive
+session writes it when you save); `mask` uses them unless `--postprocess` or `--postprocess-file`
+says otherwise:
+
+```json
+{"level": 3, "objects": [...], "postprocess": ["close:3", "fill", "largest", "margin:200um"]}
+```
+
+### Post-processing
+
+The mask computed at the run level can be cleaned up by a sequence of steps, applied in the order
+given, each to the result of the previous one:
+
+| Step | Effect |
+|------|--------|
+| `fill` | Fill 3D holes (cavities not connected to the volume border). |
+| `close:R` | Dilate then erode by R: closes gaps narrower than about 2R. Never removes mask voxels, even where the sample touches the volume edge. |
+| `open:R` | Erode then dilate by R: removes parts thinner than about 2R. Never adds mask voxels. |
+| `dilate:R` / `margin:R` | Add every voxel within distance R of the mask (the two are the same). |
+| `erode:R` | Remove every mask voxel within distance R of the background (outside the volume counts as background). |
+| `largest` | Keep the largest connected component (voxels touching by a face, edge or corner are connected). |
+| `invert` | Swap mask and background; steps after it act on the inverted mask, so put it last to invert the final result. |
+
+`R` is a number of run-level voxels (`close:3`), or a length with a unit -- `nm`, `um` (or `µm`),
+`mm`, `cm`, `m` (`margin:200um`, `close:0.2mm`). Physical radii are converted along each axis with
+the run level's voxel size and the store's axis units, so the same command gives the same physical
+clean-up at any `--level` and stays correct for non-cubic voxels; they need axis units in the
+store's metadata. Neighbourhoods are balls (ellipsoids in voxels when voxels aren't cubic).
+
+```bash
+ome-zarr-masker mask input.ome.zarr output.ome.zarr --prompts prompts.json --level 3 \
+  --axes z,y,x --direction forward_reverse --postprocess close:200um,fill,largest,margin:200um
+```
+
+Where the steps come from:
+
+- `--postprocess STEPS` (comma separated) or `--postprocess-file FILE`, a JSON object with a
+  `"postprocess"` list (a prompt file with saved steps works too); only one of the two.
+- Otherwise (`--postprocess default`, the default) the steps saved in the prompt file, or no steps
+  at all: hole filling only happens when `fill` is listed.
+- `--postprocess none` applies no steps, even if the prompt file has some.
+
+Invalid steps, radii or units fail before any segmentation. The run record lists the steps applied,
+with each radius as given and in voxels per axis, and where they came from.
 
 ### Output
 
@@ -178,11 +230,13 @@ from ome_zarr_masker import OrganMaskPredictor
 p = OrganMaskPredictor()
 p.set_volume("input.ome.zarr", level=3)  # mirrors SAM set_image
 p.add_prompts(frame_index=120, point_coords=[[340, 512]], point_labels=[1])
-mask = p.predict(axes=["z"], direction="forward")  # returns a MaskResult
+mask = p.predict(axes=["z"], direction="forward", postprocess="close:3,fill")  # a MaskResult
 mask.save("api_out.ome.zarr")  # optional: workers=4, progress=print
 ```
 
-`add_box(frame_index, box=[x0, y0, x1, y1])` adds a box; both prompt methods may be combined. The
+`add_box(frame_index, box=[x0, y0, x1, y1])` adds a box; both prompt methods may be combined.
+`postprocess` takes the steps of [Post-processing](#post-processing), as one string or a list
+(default: none). The
 saved output equals the CLI output for identical inputs/prompts. `MaskResult.save(path, overwrite=False,
 *, workers=None, progress=None)` writes it shard by shard (see [Output](#output)); `workers` sets the
 number of shards written in parallel and `progress` receives per-level messages, including the worker
@@ -196,12 +250,19 @@ read `mask.run_id` to correlate the result with its log file and saved `run_reco
 
 ```bash
 pip install -e ".[interactive]"
-ome-zarr-masker interactive input.ome.zarr --level 3
+ome-zarr-masker interactive input.ome.zarr --level 3 --prompts prompts.json --postprocess close:3,fill
 ```
 
 Place landmarks on the points layer -- new points default to positive (green); select one or more
 and press `n` to mark them negative/exclusion (red), or `y` to mark them positive again. Press `p`
 to preview the mask and `e` to export it. The session runs on the same engine as the CLI and API.
+
+The "Post-processing" panel holds the steps used by previews and exports, pre-filled from
+`--postprocess`/`--postprocess-file` or from the steps saved in the prompt file; edit them and press
+"Apply" (edits are also applied before each preview, export and save; an invalid edit is refused).
+"Save prompts" (or `w`) writes the prompts and the panel's steps to `--prompts` (default
+`prompts.json`), so `ome-zarr-masker mask ... --prompts prompts.json` reproduces the same clean-up.
+An existing `--prompts` file is loaded when the session opens.
 `INPUT` may be a remote URL (see [Remote stores](#remote-stores)); exports are local.
 
 ## Development

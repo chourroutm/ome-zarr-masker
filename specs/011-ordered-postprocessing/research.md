@@ -77,6 +77,8 @@ measured on a compute node (R8).
   Scaled ×102 to the user's run level (941 × 874 × 874 = 719 M voxels): `close:3` ≈ 2 × 60 s on one
   thread (≈ 2 × 17 s on 4), `fill` ≈ 25 s, `largest` ≈ 10–20 s, `margin:3` ≈ 60 s (≈ 17 s on 4),
   so the user's sequence is ≈ 1.5 min on 4 threads, inside SC-006 (5 min).
+- **Measured at full size** (compute node, 8 CPUs, `tests/performance/test_postprocess_perf.py`):
+  `close:3,fill,largest,margin:3` on 941 × 874 × 874 in 47.5 s, peak RSS 12.1 GiB.
 - **Rationale**: Ball structures are fastest for small radii but grow with r³; EDT is flat but uses
   ~20 bytes per voxel (float64 distances + int32 feature indices), so it runs per slab.
   The thread pool works because these scipy routines release the GIL (4 threads: 3.5× faster).

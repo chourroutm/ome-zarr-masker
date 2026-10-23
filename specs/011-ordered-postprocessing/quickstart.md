@@ -35,3 +35,20 @@ Prerequisites: `uv sync --all-extras`. Steps 1–5 run on the login node with th
    automatically placed prompts and steps saved in the prompt file (`close:100um,fill,largest,
    margin:72um`), and checks inheritance, physical-radius resolution, axis units, and that the
    written mask equals the steps applied to the raw mask. Prints a JSON report; exit 1 on failure.
+
+## Validation record (2026-10-23)
+
+- Steps 1–5 and 7 on the login node: `uv run pytest -m "not real_backend and not slow"`: 407
+  passed, 4 skipped; ruff check and format clean.
+- Steps 6–7 on a GPU node (`salloc -p mit_normal_gpu --gres=gpu:1 -c 8`, job 26652149): `-m "slow
+  or real_backend"`: 49 passed (the 48 of feature 010's baseline plus the new performance test).
+  SC-006: `close:3,fill,largest,margin:3` on 941 × 874 × 874 took **47.5 s** with **12.1 GiB**
+  peak RSS (targets: 300 s, 16 GiB).
+- Step 8 (same job): the DANDI 001278 check passed all 10 checks: both runs exit 0 and are valid
+  v0.5; steps inherited from the prompt file (`close:100um,fill,largest,margin:72um`) and
+  recorded; radii resolved to 2.782 and 2.003 voxels per axis at 35.94 µm; output axes in
+  micrometres; the written mask equals the steps applied to the raw mask; one component. The raw
+  mask (617,111 voxels) grew to 708,230 voxels, keeping every raw voxel, with no holes. Dice with a
+  global Otsu threshold of the volume was 0.196 (informative: the automatic single prompt
+  segments one region, not everything above the threshold).
+- Not exercised: the napari panel itself, because this environment has no Qt bindings.

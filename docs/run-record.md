@@ -27,9 +27,8 @@ output.ome.zarr/
 | `config.axes` | list[string] | Sweep axes; the first is the prompted axis, the rest are seeded from it (FR-022). |
 | `config.direction` | string | `forward` or `forward_reverse` (FR-006). |
 | `config.combine_rule` | string | Consensus rule across sweeps: `majority`, `union`, or `intersection` (FR-007). |
-| `config.postprocess.fill_holes` | bool | Whether interior holes were filled (default `true`). |
-| `config.postprocess.dilation_radius` | int | Dilation iterations applied (default `0`). |
-| `config.postprocess.erosion_radius` | int | Erosion iterations applied (default `0`). |
+| `config.postprocess.source` | string | Where the steps came from: `cli` (`--postprocess`), `file` (`--postprocess-file`), `prompt_file` (saved with the prompts), `api`, `none` (`--postprocess none`), or `default` (nothing given and nothing saved: no steps). |
+| `config.postprocess.steps` | list | The steps applied, in order: `op` (`fill`, `close`, `open`, `dilate`, `erode`, `margin`, `largest`, `invert`), `radius` as given (`"3"`, `"200um"`, or `null`) and `radius_voxels`, the radius in run-level voxels along each axis (`null` for steps without one). |
 | `config.model_dir` | string | Resolved weights directory (explicit > `OME_ZARR_MASKER_MODEL_DIR` > `./ome_zarr_masker_models`). |
 | `config.allow_download` | bool | Whether missing weights may be auto-downloaded. |
 | `prompts.level` | int | Pyramid level the prompt coordinates were authored at (they were converted to `level` for the run). |
@@ -42,7 +41,7 @@ Produced by:
 
 ```bash
 ome-zarr-masker mask input.ome.zarr output.ome.zarr \
-  --prompts prompts.json --level 0 --axes z,y --combine majority
+  --prompts prompts.json --level 0 --axes z,y --combine majority --postprocess close:3,fill
 ```
 
 ```json
@@ -57,9 +56,11 @@ ome-zarr-masker mask input.ome.zarr output.ome.zarr \
     "direction": "forward",
     "combine_rule": "majority",
     "postprocess": {
-      "fill_holes": true,
-      "dilation_radius": 0,
-      "erosion_radius": 0
+      "source": "cli",
+      "steps": [
+        {"op": "close", "radius": "3", "radius_voxels": [3.0, 3.0, 3.0]},
+        {"op": "fill", "radius": null, "radius_voxels": null}
+      ]
     },
     "model_dir": "/data/ome_zarr_masker_models",
     "allow_download": true
@@ -89,6 +90,10 @@ ome-zarr-masker mask input.ome.zarr output.ome.zarr \
 ## Reproducing a run
 
 The record is sufficient to reconstruct the command: read `level`, `config.axes`,
-`config.direction`, `config.combine_rule`, and `config.postprocess` for the flags, and translate
+`config.direction`, `config.combine_rule`, and `config.postprocess` for the flags (join the steps'
+`op` and `radius` as `op:radius` into `--postprocess`), and translate
 `prompts` back into a prompt file (`{"level": prompts.level, "objects": [...]}`; `points` and `box`
 use the same SAM2 convention as the input prompt file). Given the same input store and weights, the run is deterministic.
+
+The output's multiscale metadata keeps the input's axis units (e.g. `micrometer`), so physical
+sizes mean the same in the mask as in the image.
