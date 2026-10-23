@@ -268,3 +268,68 @@ def test_workers_does_not_change_output(valid_input, tmp_path):
     ra.pop("run_id")
     rb.pop("run_id")
     assert ra == rb
+
+
+# -- remote stores (feature 010, T010: C-R-CLI-1/7/8, C-LOC-2/3, FR-011) ---------------------
+
+
+@pytest.fixture
+def stub_sam2(monkeypatch):
+    """Replace SAM2 with the deterministic stub: these cases test I/O, not segmentation."""
+    from ome_zarr_masker.engine import pipeline
+
+    from ..conftest import StubBackend
+
+    monkeypatch.setattr(pipeline, "Sam2Backend", lambda config=None: StubBackend())
+
+
+def _log_text(tmp_path) -> str:
+    return "\n".join(p.read_text() for p in (tmp_path / "_logs").rglob("*") if p.is_file())
+
+
+def test_remote_http_input_local_output(
+    valid_input, tmp_path, http_store_server, stub_sam2, capsys
+):
+    import shutil
+
+    from ..conftest import assert_ome_zarr_models_valid
+
+    shutil.copytree(valid_input, http_store_server.root / "in.ome.zarr")
+    url = http_store_server.url("in.ome.zarr")
+    out = tmp_path / "out.ome.zarr"
+    prompts = _single_point_prompts(tmp_path)
+    code = main(["mask", url, str(out), "--prompts", str(prompts), "--level", "0"])
+    assert code == 0, capsys.readouterr().err
+    assert capsys.readouterr().out.strip() == str(out)
+    assert_ome_zarr_models_valid(out)
+    assert json.loads((out / "run_record.json").read_text())["input"] == url
+    assert url in _log_text(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("url", "secret"),
+    [("ftp://host/in.ome.zarr", None), ("https://u:s3cr3t@example.org/in.ome.zarr", "s3cr3t")],
+)
+def test_bad_remote_input_exits_one_cleanly(tmp_path, capsys, url, secret):
+    out = tmp_path / "out.ome.zarr"
+    prompts = _single_point_prompts(tmp_path)
+    code = main(["mask", url, str(out), "--prompts", str(prompts)])
+    captured = capsys.readouterr()
+    assert code == 1
+    assert captured.out == ""
+    assert len(captured.err.strip().splitlines()) == 1 and captured.err.startswith("error: ")
+    assert not out.exists()
+    if secret is not None:
+        assert secret not in captured.err
+        assert secret not in _log_text(tmp_path)
+
+
+def test_missing_remote_input_exits_one(tmp_path, http_store_server, capsys):
+    out = tmp_path / "out.ome.zarr"
+    prompts = _single_point_prompts(tmp_path)
+    url = http_store_server.url("nope.ome.zarr")
+    code = main(["mask", url, str(out), "--prompts", str(prompts)])
+    captured = capsys.readouterr()
+    assert code == 1 and captured.out == ""
+    assert "not found" in captured.err and url in captured.err
+    assert not out.exists()

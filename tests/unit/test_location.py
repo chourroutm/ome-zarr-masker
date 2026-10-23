@@ -183,6 +183,21 @@ def test_empty_bucket_rejected(url):
     assert exc.value.cause == "unsupported"
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("https://u:pw@example.org/x?sig=1", "https://example.org/x"),
+        ("s3://b/k?X-Amz-Signature=abc", "s3://b/k"),
+        ("s3://b/k", "s3://b/k"),
+        ("./local:path", "./local:path"),
+        ("--level", "--level"),
+    ],
+)
+def test_redact_url(value, expected):
+    """FR-011: what the invocation log records for an argument, before parsing rejects it."""
+    assert loc_mod.redact_url(value) == expected
+
+
 def test_generic_http_not_writable():
     """C-LOC-5: opening generic HTTP(S) for writing fails, naming the writable forms."""
     loc = StoreLocation.parse("https://example.org/m.ome.zarr")

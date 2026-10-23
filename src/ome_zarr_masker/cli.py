@@ -9,6 +9,13 @@ from .config import COARSEST_LEVEL, LogConfig, PostProcessConfig, RunConfig
 from .prompts.model import PromptError, load_prompt_file
 
 _LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+_INPUT_HELP = (
+    "Path or URL (http(s)://, s3://, gs://, az://, abfs://) of the input OME-Zarr v0.5 store"
+)
+_OUTPUT_HELP = (
+    "Path or URL (s3://, gs://, az://, abfs://, or an https:// link on those providers' hosts) "
+    "of the output OME-Zarr v0.5 store"
+)
 
 
 def _add_log_options(parser: argparse.ArgumentParser) -> None:
@@ -30,8 +37,8 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     mask = sub.add_parser("mask", help="Mask a structure in an OME-Zarr v0.5 volume.")
-    mask.add_argument("input", help="Path to the input OME-Zarr v0.5 store")
-    mask.add_argument("output", help="Path to the output OME-Zarr v0.5 store")
+    mask.add_argument("input", help=_INPUT_HELP)
+    mask.add_argument("output", help=_OUTPUT_HELP)
     mask.add_argument("--prompts", required=True, help="Prompt file (JSON)")
     mask.add_argument(
         "--level",
@@ -98,7 +105,7 @@ def _build_parser() -> argparse.ArgumentParser:
     interactive = sub.add_parser(
         "interactive", help="Open a napari session to place landmarks and export a mask."
     )
-    interactive.add_argument("input", help="Path to the input OME-Zarr v0.5 store")
+    interactive.add_argument("input", help=_INPUT_HELP)
     interactive.add_argument(
         "--level", type=int, default=COARSEST_LEVEL, help="Multiscale level (default: coarsest)"
     )
@@ -124,14 +131,25 @@ def _positive_int(value: str) -> int:
 
 
 def _loggable_args(args: argparse.Namespace) -> dict:
-    """Parsed arguments for the log, excluding internals (func, captured command line)."""
-    return {k: v for k, v in vars(args).items() if k != "func" and not k.startswith("_")}
+    """Parsed arguments for the log, excluding internals (func, captured command line).
+
+    String values have URL credentials removed (FR-011): the log is written before a URL that
+    carries them is rejected.
+    """
+    from .io.location import redact_url
+
+    return {
+        k: redact_url(v) if isinstance(v, str) else v
+        for k, v in vars(args).items()
+        if k != "func" and not k.startswith("_")
+    }
 
 
 def _cmd_mask(args: argparse.Namespace) -> int:
     # Import the pipeline lazily so `--help` and arg parsing stay fast and dependency-light.
     from .engine.pipeline import PipelineError, run_masking
     from .input_log import log_invocation
+    from .io.location import RemoteStoreError
     from .io.reader import ReaderError
     from .io.validate import ValidationError
     from .io.writer import WriterError
@@ -182,7 +200,14 @@ def _cmd_mask(args: argparse.Namespace) -> int:
                 workers=args.workers,
                 on_level=log.record_write_level,
             )
-        except (ValidationError, ReaderError, WriterError, PromptError, PipelineError) as exc:
+        except (
+            ValidationError,
+            ReaderError,
+            WriterError,
+            PromptError,
+            PipelineError,
+            RemoteStoreError,
+        ) as exc:
             log.mark_failed(str(exc))
             print(f"error: {exc}", file=sys.stderr)
             return 1
@@ -217,7 +242,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     effective_argv = argv if argv is not None else sys.argv[1:]
-    args._command_line = "ome-zarr-masker " + " ".join(str(a) for a in effective_argv)
+    from .io.location import redact_url
+
+    args._command_line = "ome-zarr-masker " + " ".join(redact_url(str(a)) for a in effective_argv)
     return args.func(args)
 
 

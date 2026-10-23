@@ -250,15 +250,18 @@ def http_store_server(tmp_path):
     server.stop()
 
 
-def upload_dir_to_s3(local: Path, bucket: str, prefix: str) -> None:
-    """Copy a local store directory to ``s3://bucket/prefix`` (the moto server from ``moto_s3``)."""
+def upload_dir_to_s3(local: Path, bucket: str, prefix: str, *, public: bool = False) -> None:
+    """Copy a local store directory to ``s3://bucket/prefix`` (the moto server from ``moto_s3``).
+
+    ``public`` uploads every object with a public-read ACL, readable without credentials.
+    """
     import boto3
 
     client = boto3.client("s3")
+    extra = {"ACL": "public-read"} if public else {}
     for f in sorted(p for p in local.rglob("*") if p.is_file()):
-        client.put_object(
-            Bucket=bucket, Key=f"{prefix}/{f.relative_to(local).as_posix()}", Body=f.read_bytes()
-        )
+        key = f"{prefix}/{f.relative_to(local).as_posix()}"
+        client.put_object(Bucket=bucket, Key=key, Body=f.read_bytes(), **extra)
 
 
 def download_s3_dir(bucket: str, prefix: str, local: Path) -> Path:

@@ -248,6 +248,21 @@ def _redact(scheme: str, parts) -> str:
     return f"{scheme}://{host}{parts.path}"
 
 
+def redact_url(value: str) -> str:
+    """``value`` with any URL credentials, query or fragment removed; other strings unchanged.
+
+    For logging an argument before it has been parsed (FR-011): a URL carrying credentials is
+    rejected by :meth:`StoreLocation.parse`, but the invocation log records it first.
+    """
+    m = _SCHEME.match(value)
+    if m is None:
+        return value
+    parts = urlsplit(value)
+    if "@" not in parts.netloc and not parts.query and not parts.fragment:
+        return value
+    return _redact(m.group("scheme").lower(), parts)
+
+
 def _reject_credentials(scheme: str, parts, redacted: str) -> None:
     """URLs with userinfo or a query string are refused (research R4, C-LOC-3)."""
     userinfo = parts.netloc.rpartition("@")[0] if "@" in parts.netloc else ""
@@ -344,7 +359,8 @@ def filesystem_for(location: StoreLocation):
             import aiohttp  # noqa: F401 - HTTPFileSystem needs it; fail with a clear extra name
             from fsspec.implementations import http
 
-            return http.HTTPFileSystem(**common)
+            # no credentials involved: share fsspec's cached instance (and its HTTP session)
+            return http.HTTPFileSystem(asynchronous=True)
     except ImportError as exc:
         raise _missing(location, exc) from exc
     raise ValueError(f"no filesystem for a {kind} location")
@@ -419,7 +435,9 @@ def remote_errors(location: StoreLocation) -> Iterator[None]:
     except RemoteStoreError:
         raise
     except Exception as exc:
-        mapped = map_remote_error(exc, location) if location.is_remote else None
+        # this package's own errors (validation, reader...) already say what went wrong
+        ours = type(exc).__module__.startswith("ome_zarr_masker.")
+        mapped = map_remote_error(exc, location) if location.is_remote and not ours else None
         if mapped is None:
             raise
         raise mapped from exc

@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from ..config import RunConfig
+from ..io.location import StoreLocation
 from ..io.reader import OmeZarrReader, ReaderError
 from ..io.validate import validate_ome_zarr
 from ..io.writer import write_mask
@@ -129,10 +130,11 @@ def compute_mask(
         if progress is not None:
             progress(msg)
 
+    location = StoreLocation.parse(input_path)  # parsed once; remote URLs too (feature 010)
     report("validating input")
-    validate_ome_zarr(input_path)
+    validate_ome_zarr(location)
 
-    reader = reader or OmeZarrReader(input_path)
+    reader = reader or OmeZarrReader(location)
     level = reader.resolve_level(config.level)
 
     if not config.axes:
@@ -232,7 +234,7 @@ def compute_mask(
 
     record = {
         "run_id": run_id,
-        "input": str(input_path),
+        "input": location.display,
         "level": level,
         "config": config.to_record(),
         "prompts": prompts.to_record(),

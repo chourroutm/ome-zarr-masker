@@ -10,6 +10,7 @@ import zarr
 from ome_zarr_models.v05.image import Image
 
 from ..config import COARSEST_LEVEL
+from .location import RemoteStoreError, StoreLocation, remote_errors
 
 
 class ReaderError(ValueError):
@@ -24,16 +25,26 @@ class LevelInfo:
 
 
 class OmeZarrReader:
-    """Lazy reader over an OME-Zarr v0.5 multiscale image."""
+    """Lazy reader over an OME-Zarr v0.5 multiscale image, local or remote (feature 010).
 
-    def __init__(self, store_path: str | Path):
-        self.store_path = Path(store_path)
+    ``location`` is where the store lives; ``store_path`` is its local path (``None`` for a
+    remote store). Remote stores are read through zarr, so only the metadata and the levels
+    actually read are fetched (FR-008); provider failures raise ``RemoteStoreError``.
+    """
+
+    def __init__(self, store_path: str | Path | StoreLocation):
+        self.location = StoreLocation.parse(store_path)
+        self.store_path: Path | None = self.location.path
         try:
-            group = zarr.open_group(str(self.store_path), mode="r")
-            self._image = Image.from_zarr(group)
+            with remote_errors(self.location):
+                self._store = self.location.open_store(read_only=True)
+                group = zarr.open_group(self._store, mode="r")
+                self._image = Image.from_zarr(group)
         except Exception as exc:  # noqa: BLE001 - surface a clear domain error
+            if isinstance(exc, RemoteStoreError):
+                raise
             raise ReaderError(
-                f"cannot read OME-Zarr v0.5 image at {self.store_path}: {exc}"
+                f"cannot read OME-Zarr v0.5 image at {self.location.display}: {exc}"
             ) from exc
         ms = self._image.attributes.ome.multiscales[0]
         self.axes: list[str] = [a.name for a in ms.axes]
@@ -41,12 +52,16 @@ class OmeZarrReader:
         if not self._datasets:
             raise ReaderError("multiscale image exposes no levels")
         self.levels: list[LevelInfo] = []
+        self._arrays: dict[str, zarr.Array] = {}  # opened once: no repeated metadata fetches
         for i, ds in enumerate(self._datasets):
             arr = self._open_array(ds.path)
             self.levels.append(LevelInfo(index=i, path=ds.path, shape=tuple(arr.shape)))
 
     def _open_array(self, path: str) -> zarr.Array:
-        return zarr.open_array(store=str(self.store_path), path=path, mode="r")
+        if path not in self._arrays:
+            with remote_errors(self.location):
+                self._arrays[path] = zarr.open_array(store=self._store, path=path, mode="r")
+        return self._arrays[path]
 
     @property
     def n_levels(self) -> int:
@@ -92,7 +107,9 @@ class OmeZarrReader:
 
     def read_level(self, level: int) -> np.ndarray:
         """Read a level fully into memory (callers choose a level small enough to fit)."""
-        return np.asarray(self._open_array(self._datasets[level].path)[:])
+        arr = self._open_array(self._datasets[level].path)
+        with remote_errors(self.location):
+            return np.asarray(arr[:])
 
     def multiscale_model(self) -> Image:
         return self._image
