@@ -48,6 +48,8 @@ class OmeZarrReader:
             ) from exc
         ms = self._image.attributes.ome.multiscales[0]
         self.axes: list[str] = [a.name for a in ms.axes]
+        #: Each axis's OME-Zarr unit (e.g. ``"micrometer"``), ``None`` when not declared.
+        self.axis_units: list[str | None] = [getattr(a, "unit", None) for a in ms.axes]
         self._datasets = list(ms.datasets)
         if not self._datasets:
             raise ReaderError("multiscale image exposes no levels")

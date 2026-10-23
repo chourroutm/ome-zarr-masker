@@ -311,7 +311,10 @@ def _image_model(reader: OmeZarrReader, layouts: list[LevelLayout]) -> Image:
     return Image.new(
         array_specs=[_array_spec(lay, axis_names) for lay in layouts],
         paths=[str(lay.level) for lay in layouts],
-        axes=[Axis(name=name, type="space") for name in axis_names],
+        axes=[
+            Axis(name=name, type="space", unit=unit)  # units kept (feature 011, FR-013)
+            for name, unit in zip(axis_names, reader.axis_units, strict=True)
+        ],
         scales=scales,
         translations=translations,
     )

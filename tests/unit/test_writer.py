@@ -337,3 +337,22 @@ def test_reading_one_shard_touches_one_shard_file(tmp_path, monkeypatch):
     assert np.array_equal(block, mask[0:8, 0:8, 0:8])
     data_keys = {k for k in requested if "/c/" in k}
     assert data_keys == {"0/c/0/0/0"}, data_keys
+
+
+def test_output_keeps_input_axis_units(tmp_path):
+    """FR-013 (feature 011): the mask's axes carry the input's units."""
+    import json
+
+    vol = np.zeros((8, 16, 16), np.uint8)
+    vol[2:6, 4:12, 4:12] = 200
+    reader = OmeZarrReader(
+        write_ome_zarr(
+            tmp_path / "in.ome.zarr", vol, units=("micrometer", "micrometer", "nanometer")
+        )
+    )
+    out = write_mask(tmp_path / "out.ome.zarr", vol > 0, 0, reader, {"tool": "t"})
+    axes = json.loads((out / "zarr.json").read_text())["attributes"]["ome"]["multiscales"][0][
+        "axes"
+    ]
+    assert [a.get("unit") for a in axes] == ["micrometer", "micrometer", "nanometer"]
+    assert OmeZarrReader(out).axis_units == ["micrometer", "micrometer", "nanometer"]

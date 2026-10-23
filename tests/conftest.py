@@ -43,6 +43,7 @@ def write_ome_zarr(
     shards: tuple[int, int, int] | None = None,
     scales: list[list[float]] | None = None,
     translations: list[list[float] | None] | None = None,
+    units: tuple[str | None, str | None, str | None] | None = None,
 ) -> Path:
     """Write a minimal valid OME-Zarr v0.5 multiscale image (axes z, y, x).
 
@@ -51,13 +52,15 @@ def write_ome_zarr(
     Passing different factors per axis builds an anisotropic pyramid (feature
     008-level-agnostic-prompts, FR-004). ``chunks``/``shards`` store every level with that
     layout (capped to the level); ``scales``/``translations`` override the per-level transforms
-    (feature 009-scalable-mask-writer). Defaults reproduce the original fixture exactly.
+    (feature 009-scalable-mask-writer); ``units`` sets each axis's unit (feature 011). Defaults
+    reproduce the original fixture exactly.
     """
     fz, fy, fx = axis_factors
     arrays = [level0]
     for _ in range(1, n_levels):
         arrays.append(arrays[-1][::fz, ::fy, ::fx].copy())
-    axes = [Axis(name=n, type="space") for n in ("z", "y", "x")]
+    units = units or (None, None, None)
+    axes = [Axis(name=n, type="space", unit=u) for n, u in zip(("z", "y", "x"), units, strict=True)]
     specs = [_spec(a, chunks, shards) for a in arrays]
     image = Image.new(
         array_specs=specs,

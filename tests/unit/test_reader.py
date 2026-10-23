@@ -87,3 +87,12 @@ def test_level_storage_reports_chunks_and_shards(tmp_path):
     plain = OmeZarrReader(write_ome_zarr(tmp_path / "p.ome.zarr", vol, n_levels=2))
     chunks, shards = plain.level_storage(1)
     assert chunks == (20, 35, 35) and shards is None
+
+
+def test_axis_units(tmp_path):
+    """Feature 011: the axes' units, needed to resolve physical post-processing radii."""
+    vol = np.zeros((4, 8, 8), np.uint8)
+    with_units = write_ome_zarr(tmp_path / "u.ome.zarr", vol, units=("micrometer",) * 3)
+    without = write_ome_zarr(tmp_path / "n.ome.zarr", vol)
+    assert OmeZarrReader(with_units).axis_units == ["micrometer"] * 3
+    assert OmeZarrReader(without).axis_units == [None, None, None]
