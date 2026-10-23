@@ -141,3 +141,221 @@ def sam2_available() -> bool:
     except ImportError:
         return False
     return True
+
+
+# -- remote stores (feature 010) ------------------------------------------------------------
+
+
+class _RangeHandler:
+    """Factory for a static-file handler with HTTP Range support that counts body bytes served."""
+
+    @staticmethod
+    def make(root: Path, counter: dict):
+        from http.server import SimpleHTTPRequestHandler
+
+        class Handler(SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, directory=str(root), **kwargs)
+
+            def log_message(self, *args):  # keep test output quiet
+                pass
+
+            def _target(self) -> Path | None:
+                p = Path(self.translate_path(self.path))
+                return p if p.is_file() else None
+
+            def do_HEAD(self):  # noqa: N802
+                p = self._target()
+                if p is None:
+                    self.send_error(404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Length", str(p.stat().st_size))
+                self.send_header("Accept-Ranges", "bytes")
+                self.end_headers()
+
+            def do_GET(self):  # noqa: N802
+                p = self._target()
+                if p is None:
+                    self.send_error(404)
+                    return
+                data = p.read_bytes()
+                rng = self.headers.get("Range")
+                status = 200
+                if rng and rng.startswith("bytes="):
+                    start_s, _, end_s = rng[6:].partition("-")
+                    if start_s == "":
+                        start, end = max(0, len(data) - int(end_s)), len(data) - 1
+                    else:
+                        start = int(start_s)
+                        end = int(end_s) if end_s else len(data) - 1
+                    end = min(end, len(data) - 1)
+                    body = data[start : end + 1]
+                    status = 206
+                else:
+                    body = data
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Accept-Ranges", "bytes")
+                if status == 206:
+                    self.send_header("Content-Range", f"bytes {start}-{end}/{len(data)}")
+                self.end_headers()
+                self.wfile.write(body)
+                counter["bytes"] += len(body)
+                counter["requests"].append(self.path)
+
+        return Handler
+
+
+class HttpStoreServer:
+    """A local HTTP server over ``root``; ``url(rel)`` names a served path."""
+
+    def __init__(self, root: Path):
+        import threading
+        from http.server import ThreadingHTTPServer
+
+        self.root = root
+        self.counter = {"bytes": 0, "requests": []}
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), _RangeHandler.make(root, self.counter))
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+        self.base = f"http://127.0.0.1:{self._server.server_address[1]}"
+        self.running = True
+
+    def url(self, rel: str) -> str:
+        return f"{self.base}/{rel}"
+
+    @property
+    def bytes_served(self) -> int:
+        return self.counter["bytes"]
+
+    def reset_counter(self) -> None:
+        self.counter["bytes"] = 0
+        self.counter["requests"].clear()
+
+    def stop(self) -> None:
+        if self.running:
+            self._server.shutdown()
+            self._server.server_close()
+            self.running = False
+
+
+@pytest.fixture
+def http_store_server(tmp_path):
+    """Serve ``tmp_path / "served"`` over HTTP (Range-capable, byte-counting)."""
+    root = tmp_path / "served"
+    root.mkdir()
+    server = HttpStoreServer(root)
+    yield server
+    server.stop()
+
+
+def upload_dir_to_s3(local: Path, bucket: str, prefix: str) -> None:
+    """Copy a local store directory to ``s3://bucket/prefix`` (the moto server from ``moto_s3``)."""
+    import boto3
+
+    client = boto3.client("s3")
+    for f in sorted(p for p in local.rglob("*") if p.is_file()):
+        client.put_object(
+            Bucket=bucket, Key=f"{prefix}/{f.relative_to(local).as_posix()}", Body=f.read_bytes()
+        )
+
+
+def download_s3_dir(bucket: str, prefix: str, local: Path) -> Path:
+    """Copy every object under ``s3://bucket/prefix`` into ``local`` (to validate/compare it)."""
+    import boto3
+
+    client = boto3.client("s3")
+    pages = client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix + "/")
+    for page in pages:
+        for obj in page.get("Contents", []):
+            dest = local / obj["Key"][len(prefix) + 1 :]
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(client.get_object(Bucket=bucket, Key=obj["Key"])["Body"].read())
+    return local
+
+
+@pytest.fixture
+def moto_s3(monkeypatch):
+    """An in-process moto S3 server with test credentials; yields its endpoint URL."""
+    from moto.server import ThreadedMotoServer
+
+    server = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)
+    server.start()
+    host, port = server.get_host_and_port()
+    endpoint = f"http://{host}:{port}"
+    monkeypatch.setenv("AWS_ENDPOINT_URL", endpoint)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    for var in ("AWS_PROFILE", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+    yield endpoint
+    server.stop()
+
+
+class FailingMemoryFileSystem:
+    """Factory for an in-memory filesystem whose writes fail after ``fail_after`` puts."""
+
+    @staticmethod
+    def make(fail_after: int | None, log: list):
+        from fsspec.implementations.memory import MemoryFileSystem
+
+        class Failing(MemoryFileSystem):
+            def pipe_file(self, path, value, *args, **kwargs):
+                if fail_after is not None and len(log) >= fail_after:
+                    raise OSError(f"injected failure writing {path}")
+                log.append(path)
+                return super().pipe_file(path, value, *args, **kwargs)
+
+        Failing.store = {}  # a store of its own, not shared with other MemoryFileSystem uses
+        Failing.pseudo_dirs = [""]
+        return Failing
+
+
+@pytest.fixture
+def memory_fs(monkeypatch):
+    """Route ``s3://`` locations to an in-memory filesystem; ``memory_fs.fail_after(n)`` injects
+    a write failure after ``n`` puts. Yields a controller with ``fs`` (sync) and ``puts`` (log)."""
+    from fsspec.implementations.asyn_wrapper import AsyncFileSystemWrapper
+
+    from ome_zarr_masker.io import location as loc_mod
+
+    class Controller:
+        def __init__(self):
+            self.puts: list[str] = []
+            self.fail_after(None)
+
+        def fail_after(self, n: int | None) -> None:
+            store = getattr(self, "fs", None)
+            cls = FailingMemoryFileSystem.make(n, self.puts)
+            if store is not None:
+                cls.store = type(store).store  # keep the contents across failure settings
+                cls.pseudo_dirs = type(store).pseudo_dirs
+            self.fs = cls(skip_instance_cache=True)
+
+    ctl = Controller()
+    monkeypatch.setitem(
+        loc_mod._FILESYSTEM_OVERRIDE,
+        "s3",
+        lambda location: AsyncFileSystemWrapper(ctl.fs, asynchronous=True),
+    )
+    return ctl
+
+
+def live_url(provider: str) -> str | None:
+    """The opt-in live test prefix for ``provider`` (S3, GCS or AZURE), if configured."""
+    import os
+
+    return os.environ.get(f"OME_ZARR_MASKER_TEST_{provider}_URL") or None
+
+
+class StubBackend:
+    """Deterministic stand-in for SAM2: foreground wherever the frame is bright.
+
+    Used by remote-store tests, which check I/O equivalence, not segmentation quality.
+    """
+
+    def segment_video(self, frames: np.ndarray, prompts) -> np.ndarray:
+        gray = frames[..., 0] if frames.ndim == 4 else frames
+        return gray > 100

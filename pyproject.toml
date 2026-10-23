@@ -17,7 +17,12 @@ dependencies = [
 [project.optional-dependencies]
 sam2 = ["torch", "sam2"]
 interactive = ["napari"]
-dev = ["pytest", "ruff"]
+s3 = ["fsspec", "s3fs"]
+gcs = ["fsspec", "gcsfs"]
+azure = ["fsspec", "adlfs"]
+http = ["fsspec", "aiohttp"]
+remote = ["ome-zarr-masker[s3,gcs,azure,http]"]
+dev = ["pytest", "ruff", "moto[server]"]
 
 [project.scripts]
 ome-zarr-masker = "ome_zarr_masker.cli:main"
@@ -37,4 +42,5 @@ testpaths = ["tests"]
 markers = [
     "real_backend: tests that require an installed SAM backend and/or GPU (skipped by default)",
     "slow: longer-running tests",
+    "remote_live: tests against real cloud buckets, run only when OME_ZARR_MASKER_TEST_{S3,GCS,AZURE}_URL is set",
 ]
