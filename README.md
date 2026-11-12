@@ -8,11 +8,6 @@ levels.
 Three entry points share one engine (CLI, Python API, interactive napari session), so they produce
 identical results for identical inputs.
 
-> Formerly `organ-masker-lite`. The package (`ome_zarr_masker`), command (`ome-zarr-masker`),
-> environment variables (`OME_ZARR_MASKER_*`) and default directories (`./ome_zarr_masker_models`,
-> `./ome_zarr_masker_logs`) were renamed; move existing `./organ_masker_models` weights to the new
-> directory (or pass `--model-dir`) to avoid re-downloading them.
-
 ## Features
 
 - OME-Zarr v0.5 in, OME-Zarr v0.5 mask out, validated in-process by the bundled `ome-zarr-models`.
